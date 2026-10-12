@@ -51,6 +51,7 @@ fn detected_providers(settings: &Settings) -> [bool; DRIVERS] {
             }
             ProviderKind::Antigravity => crate::antigravity::is_installed(path),
             ProviderKind::Grok => crate::grok::is_installed(path),
+            ProviderKind::Junie => crate::junie::is_installed(path),
             ProviderKind::Kiro => crate::kiro::source_is_ready(
                 path,
                 instance.kiro_crew_path.as_deref(),

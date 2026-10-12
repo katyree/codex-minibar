@@ -9,6 +9,7 @@ pub mod discovery;
 pub mod grok;
 pub mod i18n;
 pub mod instances;
+pub mod junie;
 pub mod kiro;
 pub mod limits;
 pub mod logger;

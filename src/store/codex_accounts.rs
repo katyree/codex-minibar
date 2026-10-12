@@ -985,6 +985,9 @@ mod tests {
     fn at(seconds: i64) -> DateTime<Utc> {
         Utc.timestamp_opt(seconds, 0).unwrap()
     }
+    fn day(seconds: i64) -> NaiveDate {
+        at(seconds).with_timezone(&Local).date_naive()
+    }
     fn identity_for(id: &str, stamp: u128) -> Option<Identity> {
         Some(Identity {
             id: id.into(),
@@ -1182,7 +1185,7 @@ mod tests {
         assert_eq!(count(&db, "codex_events"), 4);
         assert_eq!(count(&db, "codex_event_links"), 5);
         let day = |db: &ProviderStore, who: &str| {
-            db.account_daily_for(who, at(0).date_naive(), at(200).date_naive())
+            db.account_daily_for(who, day(0), day(200))
                 .unwrap()
                 .iter()
                 .map(|r| r.2.input_tokens)
@@ -1463,15 +1466,14 @@ mod tests {
         assert_eq!(adopted.historical_owner, "first-account");
         assert!(!adopted.history_pending);
         assert_eq!(
-            db.account_daily_for("first-account", at(0).date_naive(), at(200).date_naive())
+            db.account_daily_for("first-account", day(0), day(200))
                 .unwrap()[0]
                 .2
                 .input_tokens,
             100
         );
         assert_eq!(
-            db.account_daily_for(UNKNOWN, at(0).date_naive(), at(200).date_naive())
-                .unwrap()[0]
+            db.account_daily_for(UNKNOWN, day(0), day(200)).unwrap()[0]
                 .2
                 .input_tokens,
             7
@@ -1576,8 +1578,7 @@ mod tests {
         .unwrap();
         for (owner, tokens) in [("old", 100), ("new", 10), ("third", 7)] {
             assert_eq!(
-                db.account_daily_for(owner, at(0).date_naive(), at(200).date_naive())
-                    .unwrap()[0]
+                db.account_daily_for(owner, day(0), day(200)).unwrap()[0]
                     .2
                     .input_tokens,
                 tokens
@@ -1596,13 +1597,11 @@ mod tests {
         repriced.usage.estimated_cost_microusd = 900;
         db.save_account_events(&[repriced], &state, &None, &None, at(130))
             .unwrap();
-        let rows = db
-            .account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-            .unwrap();
+        let rows = db.account_daily_for("new", day(0), day(200)).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].2.estimated_cost_microusd, 900);
         assert!(
-            db.account_daily_for(UNKNOWN, at(0).date_naive(), at(200).date_naive())
+            db.account_daily_for(UNKNOWN, day(0), day(200))
                 .unwrap()
                 .is_empty()
         );
@@ -1649,9 +1648,7 @@ mod tests {
         )
         .unwrap();
         for (owner, total) in [("old", 100), ("new", 10), ("third", 7)] {
-            let rows = db
-                .account_daily_for(owner, at(0).date_naive(), at(200).date_naive())
-                .unwrap();
+            let rows = db.account_daily_for(owner, day(0), day(200)).unwrap();
             assert_eq!(rows.len(), 1);
             assert_eq!(rows[0].2.input_tokens, total);
             assert_eq!(rows[0].2.cached_input_tokens, total / 2);
@@ -1682,9 +1679,7 @@ mod tests {
                 [],
             )
             .unwrap();
-        let mut rows = db
-            .account_projects_for("new", at(0).date_naive(), at(200).date_naive())
-            .unwrap();
+        let mut rows = db.account_projects_for("new", day(0), day(200)).unwrap();
         rows.sort_by(|a, b| a.0.cmp(&b.0));
         let rows = rows
             .into_iter()
@@ -1774,8 +1769,7 @@ mod tests {
         fs::write(&path, record(2)).unwrap();
         save(crate::usage::scan_file_delta(&path, source, &mut file).unwrap());
         assert_eq!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-                .unwrap()[0]
+            db.account_daily_for("new", day(0), day(200)).unwrap()[0]
                 .2
                 .input_tokens,
             2
@@ -1793,7 +1787,7 @@ mod tests {
         fs::write(&path, "").unwrap();
         save(crate::usage::scan_file_delta(&path, source, &mut file).unwrap());
         assert!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
+            db.account_daily_for("new", day(0), day(200))
                 .unwrap()
                 .is_empty()
         );
@@ -1821,8 +1815,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-                .unwrap()[0]
+            db.account_daily_for("new", day(0), day(200)).unwrap()[0]
                 .2
                 .input_tokens,
             30
@@ -1839,7 +1832,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            db.account_daily_for(UNKNOWN, at(0).date_naive(), at(200).date_naive())
+            db.account_daily_for(UNKNOWN, day(0), day(200))
                 .unwrap()
                 .is_empty()
         );
@@ -1853,8 +1846,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-                .unwrap()[0]
+            db.account_daily_for("new", day(0), day(200)).unwrap()[0]
                 .2
                 .input_tokens,
             20
@@ -1880,8 +1872,7 @@ mod tests {
             .is_err()
         );
         assert_eq!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-                .unwrap()[0]
+            db.account_daily_for("new", day(0), day(200)).unwrap()[0]
                 .2
                 .input_tokens,
             10
@@ -2007,7 +1998,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
+            db.account_daily_for("new", day(0), day(200))
                 .unwrap()
                 .is_empty()
         );
@@ -2093,9 +2084,7 @@ mod tests {
         )
         .unwrap();
 
-        let rows = db
-            .account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-            .unwrap();
+        let rows = db.account_daily_for("new", day(0), day(200)).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].2.input_tokens, 7);
         assert_eq!(
@@ -2129,8 +2118,7 @@ mod tests {
         db.migrate_codex_accounts().unwrap();
         assert_eq!(db.conn.query_row("SELECT COUNT(*) FROM codex_event_links l JOIN codex_names n ON n.id=l.source WHERE n.name='sessions/old/rollout.jsonl'", [], |r| r.get::<_, i64>(0)).unwrap(), 1);
         assert_eq!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-                .unwrap()[0]
+            db.account_daily_for("new", day(0), day(200)).unwrap()[0]
                 .2
                 .input_tokens,
             10
@@ -2145,7 +2133,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
+            db.account_daily_for("new", day(0), day(200))
                 .unwrap()
                 .is_empty()
         );
@@ -2174,8 +2162,7 @@ mod tests {
         db.save_account_scan(&[], &["sessions/a.jsonl".into()], &s, &None, &None, at(130))
             .unwrap();
         assert_eq!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-                .unwrap()[0]
+            db.account_daily_for("new", day(0), day(200)).unwrap()[0]
                 .2
                 .input_tokens,
             30
@@ -2192,8 +2179,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-                .unwrap()[0]
+            db.account_daily_for("new", day(0), day(200)).unwrap()[0]
                 .2
                 .input_tokens,
             20
@@ -2241,8 +2227,7 @@ mod tests {
             .unwrap();
         assert_eq!(cached.daily[0].usage.input_tokens, 40);
         assert_eq!(
-            db.account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-                .unwrap()[0]
+            db.account_daily_for("new", day(0), day(200)).unwrap()[0]
                 .2
                 .input_tokens,
             40
@@ -2259,9 +2244,7 @@ mod tests {
             at(130),
         )
         .unwrap();
-        let rows = db
-            .account_daily_for("new", at(0).date_naive(), at(200).date_naive())
-            .unwrap();
+        let rows = db.account_daily_for("new", day(0), day(200)).unwrap();
         assert_eq!(rows[0].2.input_tokens, 40);
         assert_eq!(rows[0].2.requests, 3);
     }

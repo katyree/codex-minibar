@@ -20,17 +20,17 @@ use zip::ZipArchive;
 use crate::notifications;
 use crate::single_instance::release_for_update;
 
-pub const GITHUB_OWNER: &str = "vertopolkaLF";
+pub const GITHUB_OWNER: &str = "katyree";
 pub const GITHUB_REPO: &str = "codex-minibar";
-pub const RELEASES_URL: &str = "https://github.com/vertopolkaLF/codex-minibar/releases";
-pub const REPO_URL: &str = "https://github.com/vertopolkaLF/codex-minibar";
-pub const ISSUES_URL: &str = "https://github.com/vertopolkaLF/codex-minibar/issues";
+pub const RELEASES_URL: &str = "https://github.com/katyree/codex-minibar/releases";
+pub const REPO_URL: &str = "https://github.com/katyree/codex-minibar";
+pub const ISSUES_URL: &str = "https://github.com/katyree/codex-minibar/issues";
 pub const PROVIDER_REQUEST_ISSUE_URL: &str =
-    "https://github.com/vertopolkaLF/codex-minibar/issues/new?template=03-provider-request.yml";
-pub const CONTRIBUTING_URL: &str = "https://github.com/vertopolkaLF/codex-minibar#contributing";
+    "https://github.com/katyree/codex-minibar/issues/new?template=03-provider-request.yml";
+pub const CONTRIBUTING_URL: &str = "https://github.com/katyree/codex-minibar#contributing";
 
 const LATEST_RELEASE_API: &str =
-    "https://api.github.com/repos/vertopolkaLF/codex-minibar/releases/latest";
+    "https://api.github.com/repos/katyree/codex-minibar/releases/latest";
 const APP_EXE: &str = "codex-minibar.exe";
 const USER_AGENT: &str = "codex-minibar-updater";
 const UPDATE_SUCCESS_MARKER: &str = ".update-success-pending";

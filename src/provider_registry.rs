@@ -179,6 +179,13 @@ const KIRO_METRICS: &[MetricDescriptor] = &[MetricDescriptor {
     source: MetricSource::Secondary,
 }];
 
+const JUNIE_METRICS: &[MetricDescriptor] = &[MetricDescriptor {
+    id: "junie.credits",
+    label: "AI credits",
+    label_key: "junie-ai-credits",
+    source: MetricSource::Secondary,
+}];
+
 pub const PROVIDERS: &[ProviderDescriptor] = &[
     ProviderDescriptor {
         kind: ProviderKind::Codex,
@@ -292,6 +299,18 @@ pub const PROVIDERS: &[ProviderDescriptor] = &[
         metrics: KIRO_METRICS,
         default_tray_metrics: &["kiro.additional.credits"],
     },
+    ProviderDescriptor {
+        kind: ProviderKind::Junie,
+        id: "junie",
+        display_name: "Junie",
+        icon: "junie",
+        brand_rgb: (109, 232, 133),
+        supports_activation: false,
+        include_in_total_spend: false,
+        supports_multiple_instances: false,
+        metrics: JUNIE_METRICS,
+        default_tray_metrics: &["junie.credits"],
+    },
 ];
 
 pub fn descriptor(provider: ProviderKind) -> &'static ProviderDescriptor {
@@ -334,6 +353,7 @@ pub fn light_surface_brand_rgb(provider: ProviderKind) -> (u8, u8, u8) {
         ProviderKind::Antigravity => (32, 96, 205),
         ProviderKind::Grok => (51, 51, 51),
         ProviderKind::Kiro => (105, 78, 198),
+        ProviderKind::Junie => (30, 125, 64),
     }
 }
 
@@ -398,6 +418,7 @@ pub fn supports_banked_resets(provider: ProviderKind) -> bool {
             | ProviderKind::Antigravity
             | ProviderKind::Grok
             | ProviderKind::Kiro
+            | ProviderKind::Junie
     )
 }
 
@@ -409,6 +430,7 @@ pub fn supports_credits(provider: ProviderKind) -> bool {
             | ProviderKind::Antigravity
             | ProviderKind::Grok
             | ProviderKind::Kiro
+            | ProviderKind::Junie
     )
 }
 
@@ -416,7 +438,7 @@ pub fn supports_credits(provider: ProviderKind) -> bool {
 pub fn supports_usage_stats(provider: ProviderKind) -> bool {
     !matches!(
         provider,
-        ProviderKind::Antigravity | ProviderKind::Grok | ProviderKind::Kiro
+        ProviderKind::Antigravity | ProviderKind::Grok | ProviderKind::Kiro | ProviderKind::Junie
     )
 }
 

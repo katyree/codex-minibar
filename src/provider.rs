@@ -294,6 +294,10 @@ fn start_driver_worker(
                 false
             )
         }
+        ProviderKind::Junie => {
+            let client = || crate::junie::JunieClient::new(instance.binary_path.as_deref());
+            start_worker!(client(), client(), crate::junie::JunieActivator, false)
+        }
         ProviderKind::Kiro => {
             let client = || {
                 crate::kiro::KiroClient::with_paths(
@@ -382,6 +386,7 @@ fn provider_activation_path(provider: ProviderId, base_path: PathBuf) -> PathBuf
         ProviderKind::Antigravity => base_path.with_file_name("activation-antigravity.toml"),
         ProviderKind::Grok => base_path.with_file_name("activation-grok.toml"),
         ProviderKind::Kiro => base_path.with_file_name("activation-kiro.toml"),
+        ProviderKind::Junie => base_path.with_file_name("activation-junie.toml"),
     }
 }
 

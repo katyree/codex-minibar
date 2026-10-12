@@ -25,6 +25,19 @@
 
 ---
 
+## Junie in this fork
+
+This fork adds Junie subscription quota tracking. Enable **Junie** in Settings → Providers, or use **Add provider** when upgrading an existing Minibar configuration. Home cards and tray widgets show JetBrains AI credits used or remaining, absolute credit totals, and the next refill date.
+
+Junie and AI Assistant share the JetBrains AI account credit pool. This is the quota shown in Junie's **License & quota** view, not project **All-time** activity or estimated API spend.
+
+- Live source: install JetBrains Central, complete its normal sign-in, and check `central limit --json`. Minibar reuses that CLI without copying credentials.
+- IDE fallback: when Central is absent, Minibar reads the newest `options/AIAssistantQuotaManager2.xml` under `%APPDATA%\JetBrains`. The saved file timestamp remains visible; Refresh cannot make an IDE cache live.
+- Set **JetBrains quota source path** to a folder containing `central.exe`, an IDE configuration/options folder, or the quota XML file. A configured source stays isolated from other automatic sources. A failed Central request reports an error rather than substituting another IDE's cached account.
+- Automatic session activation and local token/cost history are unavailable for this quota-only provider.
+
+Download Windows builds from [this fork's releases](https://github.com/katyree/codex-minibar/releases). Upstream UI, themes, and other providers come from [vertopolkaLF/codex-minibar](https://github.com/vertopolkaLF/codex-minibar).
+
 ## Overview
 
 Codex Minibar reads quota data from locally authenticated provider sessions and keeps subscription limits and reset times visible in the notification area. It is a native Windows application written in Rust, with the tray popup and Settings both rendered by GPUI.

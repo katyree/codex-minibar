@@ -2674,3 +2674,10 @@ status-stage-in-progress = En cours
 
 # src/settings_window/notifications.rs
 news-and-status = Actualités et état
+
+# Junie subscription quota integration
+junie-ai-credits = AI credits
+junie-source-path = JetBrains quota source path
+junie-source-path-help = Folder containing central.exe, or the IDE configuration folder containing options/AIAssistantQuotaManager2.xml. Leave empty for automatic detection.
+junie-provider-help = Reads JetBrains AI credits shared by Junie and AI Assistant. Central supplies live quota; the IDE cache retains its saved timestamp. Sign in through JetBrains.
+junie-ide-cache = JetBrains IDE quota cache

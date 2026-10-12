@@ -40,6 +40,7 @@ impl ProviderInstallStatus {
         match provider {
             ProviderKind::Kiro => Self::checking_kiro(),
             ProviderKind::Grok => Self::checking_cli(),
+            ProviderKind::Junie => Self::checking(),
             ProviderKind::Codex | ProviderKind::Claude | ProviderKind::Antigravity => {
                 Self::checking()
             }
@@ -231,6 +232,20 @@ pub(crate) fn provider_install_status(
                 used,
             )
         }
+        ProviderKind::Junie => {
+            let cli = crate::junie::central_path(configured_folder);
+            let app = crate::junie::cache_path(configured_folder);
+            let used = if cli.is_some() {
+                Some(ProviderInstallSource::Cli)
+            } else {
+                app.as_ref().map(|_| ProviderInstallSource::App)
+            };
+            (
+                app.as_deref().map(display_fs_path),
+                cli.as_deref().map(display_fs_path),
+                used,
+            )
+        }
         ProviderKind::Grok => {
             let cli = crate::grok::cli_available(configured_folder);
             (
@@ -256,6 +271,7 @@ pub(crate) fn provider_install_status(
                 | ProviderKind::Claude
                 | ProviderKind::Antigravity
                 | ProviderKind::Grok
+                | ProviderKind::Junie
         ),
         checking: false,
     }
@@ -654,6 +670,11 @@ fn folder_configs(driver: ProviderKind) -> Vec<FolderConfig> {
             crate::i18n::tr("folder-with-grok-exe-grok-cmd-or-grok-ps1-leave-empty-to-find-it"),
             r"C:\Users\you\.grok\bin",
         )],
+        ProviderKind::Junie => vec![binary(
+            crate::i18n::tr("junie-source-path"),
+            crate::i18n::tr("junie-source-path-help"),
+            r"C:\Users\you\.local\bin",
+        )],
         ProviderKind::Kiro => vec![
             binary(
                 crate::i18n::tr("kiro-ide-folder"),
@@ -705,6 +726,7 @@ fn provider_description(provider: ProviderKind) -> &'static str {
         ProviderKind::Grok => {
             crate::i18n::tr("reads-supergrok-subscription-credits-from-your-existing-official")
         }
+        ProviderKind::Junie => crate::i18n::tr("junie-provider-help"),
         ProviderKind::Kiro => {
             crate::i18n::tr("fetches-kiro-s-live-monthly-credits-with-its-shared-sign-in-recog")
         }
@@ -727,6 +749,7 @@ fn source_labels(provider: ProviderKind) -> (&'static str, &'static str, &'stati
         ProviderKind::Cursor => (crate::i18n::tr("cursor-app"), "", ""),
         ProviderKind::Antigravity => (crate::i18n::tr("antigravity-app"), "", "agy CLI"),
         ProviderKind::Grok => ("", "", crate::i18n::tr("grok-cli")),
+        ProviderKind::Junie => (crate::i18n::tr("junie-ide-cache"), "", "JetBrains Central"),
         ProviderKind::Kiro => (
             crate::i18n::tr("kiro-ide"),
             crate::i18n::tr("kiro-crew"),
