@@ -14,7 +14,7 @@ InstallDir "{{INSTALL_DIR}}"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 
-VIProductVersion "{{VERSION}}.0"
+VIProductVersion "{{NUMERIC_VERSION}}"
 VIAddVersionKey "ProductName" "{{PRODUCT_NAME}}"
 VIAddVersionKey "CompanyName" "{{PUBLISHER}}"
 VIAddVersionKey "FileDescription" "{{PRODUCT_NAME}} Setup ({{ARCH}})"

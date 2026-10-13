@@ -25,6 +25,34 @@
 
 ---
 
+## Junie in this fork
+
+This fork adds Junie subscription quota tracking. Enable **Junie** in Settings → Providers, or use **Add provider** when upgrading an existing Minibar configuration. Home cards and tray widgets show JetBrains AI credits used or remaining, absolute credit totals, and the next refill date.
+
+Junie and AI Assistant share the JetBrains AI account credit pool. This is the quota shown in Junie's **License & quota** view, not project **All-time** activity or estimated API spend.
+
+- Live source: install JetBrains Central, complete its normal sign-in, and check `central limit --json`. Minibar reuses that CLI without copying credentials.
+- IDE fallback: when Central is absent, Minibar reads the newest `options/AIAssistantQuotaManager2.xml` under `%APPDATA%\JetBrains`. The saved file timestamp remains visible; Refresh cannot make an IDE cache live.
+- Set **JetBrains quota source path** to a folder containing `central.exe`, an IDE configuration/options folder, or the quota XML file. A configured source stays isolated from other automatic sources. A failed Central request reports an error rather than substituting another IDE's cached account.
+- Automatic session activation and local token/cost history are unavailable for this quota-only provider.
+
+Download Windows builds from [this fork's releases](https://github.com/katyree/codex-minibar/releases). Upstream UI, themes, and other providers come from [vertopolkaLF/codex-minibar](https://github.com/vertopolkaLF/codex-minibar).
+
+## Connect Muse from Chrome
+
+This fork also supports the personal agent at [muse.ai](https://muse.ai/), separate from Muse Code CLI. Home and tray widgets show its weekly subscription percentage and reset time. The provider also reports the plan name when available. It does not estimate token totals, top-up balances, or local spend history.
+
+Connect your account in Minibar:
+
+1. Enable **Muse** in **Settings → Providers**, or choose **Add provider** when upgrading.
+2. Sign in to muse.ai in Chrome. Press **F12**, select **Network**, and open Muse's **Settings → General**.
+3. Select the POST request to muse.ai that loads subscription usage. Under **Headers → Request Headers**, copy only the **Cookie** header value.
+4. In Minibar's Muse settings, choose **Add credential**, paste the value, and choose **Check and save**.
+
+Minibar validates the session before saving it with Windows user-scoped DPAPI encryption outside the settings file. Keep the credential private. Do not share a Cookie header, copied request, or HAR file. If Muse signs you out, sign in again and use **Replace credential**. **Remove** forgets Minibar's saved session without changing your Chrome sign-in.
+
+Muse uses a private website request rather than a public quota API. Minibar discovers its subscription action from Muse's current website files and retries discovery when that action changes. A website change can still require a provider update. Missing usage reports an error rather than zero usage.
+
 ## Overview
 
 Codex Minibar reads quota data from locally authenticated provider sessions and keeps subscription limits and reset times visible in the notification area. It is a native Windows application written in Rust, with the tray popup and Settings both rendered by GPUI.

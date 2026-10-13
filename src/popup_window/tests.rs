@@ -393,6 +393,24 @@ fn disabled_five_hour_session_is_omitted_from_popup() {
 }
 
 #[test]
+fn muse_free_plan_keeps_weekly_card_and_remaining_percentage() {
+    let limits = RateLimits {
+        plan_type: Some("Free".into()),
+        secondary: LimitWindow {
+            used_percent: Some(2),
+            duration_minutes: Some(7 * 24 * 60),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    assert_eq!(
+        popup_sections(ProviderKind::Muse, &limits, false),
+        vec![PopupSection::Weekly]
+    );
+    assert_eq!(limits.secondary.remaining_percent(), Some(98));
+}
+
+#[test]
 fn zen_without_quota_windows_does_not_render_placeholder_limit_cards() {
     let limits = RateLimits {
         plan_type: Some("Zen · 2 models".into()),
@@ -1253,6 +1271,29 @@ fn only_read_relevant_changes_restart_an_instance_worker() {
         .unwrap();
     codex.credentials_revision += 1;
     assert_eq!(bridge::instances_needing_restart(&before, &after).len(), 2);
+}
+
+#[test]
+fn replacing_disabled_muse_session_clears_quota_before_reenabling() {
+    let mut muse = ProviderInstance::primary(ProviderKind::Muse);
+    muse.enabled = false;
+    let before = vec![muse];
+    let mut after = before.clone();
+    after[0].enabled = true;
+    assert!(bridge::instances_needing_quota_clear(&before, &after).is_empty());
+    after[0].enabled = false;
+    after[0].credentials_revision += 1;
+    assert_eq!(
+        bridge::instances_needing_quota_clear(&before, &after),
+        vec![id(ProviderKind::Muse)]
+    );
+    assert!(bridge::instances_needing_restart(&before, &after).is_empty());
+    after[0].enabled = true;
+    assert_eq!(
+        bridge::instances_needing_quota_clear(&before, &after),
+        vec![id(ProviderKind::Muse)]
+    );
+    assert!(bridge::instances_needing_restart(&before, &after).is_empty());
 }
 
 #[test]

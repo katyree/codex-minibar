@@ -1,11 +1,11 @@
 [package]
 name = "codex-minibar"
-version = "1.1.0"
+version = "1.1.0-junie.2"
 edition = "2024"
 description = "Windows tray companion for monitoring AI tools usage"
 license = "Apache-2.0"
-repository = "https://github.com/vertopolkaLF/codex-minibar"
-homepage = "https://github.com/vertopolkaLF/codex-minibar"
+repository = "https://github.com/katyree/codex-minibar"
+homepage = "https://github.com/katyree/codex-minibar"
 readme = "README.md"
 keywords = ["codex", "windows", "tray", "usage", "gpui"]
 categories = ["command-line-utilities", "gui"]
@@ -39,6 +39,7 @@ windows-core = { git = "https://github.com/microsoft/windows-rs", rev = "07f344c
 gpui = { version = "0.2.2", default-features = false }
 futures = "0.3"
 raw-window-handle = "0.6"
+regex = "1.13.1"
 resvg = { version = "0.45", default-features = false }
 smallvec = "1"
 unicode-segmentation = "1"

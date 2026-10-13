@@ -857,6 +857,8 @@ impl Palette {
                 }
             }
             ProviderKind::Kiro => (151, 125, 255),
+            ProviderKind::Junie => (109, 232, 133),
+            ProviderKind::Muse => (83, 141, 240),
         })
     }
 

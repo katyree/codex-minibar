@@ -40,6 +40,8 @@ impl ProviderInstallStatus {
         match provider {
             ProviderKind::Kiro => Self::checking_kiro(),
             ProviderKind::Grok => Self::checking_cli(),
+            ProviderKind::Junie => Self::checking(),
+            ProviderKind::Muse => Self::checking_app(),
             ProviderKind::Codex | ProviderKind::Claude | ProviderKind::Antigravity => {
                 Self::checking()
             }
@@ -113,6 +115,19 @@ pub(crate) fn instance_install_status(instance: &ProviderInstance) -> ProviderIn
     };
     let provider = instance.provider_id();
     match instance.driver {
+        ProviderKind::Muse => {
+            let configured = crate::muse::session_is_configured(&instance.id);
+            ProviderInstallStatus {
+                app: configured.then(|| crate::i18n::tr("saved-in-windows-user-storage").into()),
+                used: configured.then_some(ProviderInstallSource::App),
+                app_applicable: true,
+                cli_applicable: false,
+                crew_applicable: false,
+                checking: false,
+                cli: None,
+                crew: None,
+            }
+        }
         ProviderKind::Kiro => provider_install_status_kiro(
             &path(&instance.binary_path),
             &path(&instance.kiro_crew_path),
@@ -216,10 +231,24 @@ pub(crate) fn provider_install_status(
                 detected.then(|| crate::i18n::tr("opencode-auth-json-or-local-database").into());
             (detail, None, detected.then_some(ProviderInstallSource::App))
         }
-        ProviderKind::OpenRouter => (None, None, None),
+        ProviderKind::OpenRouter | ProviderKind::Muse => (None, None, None),
         ProviderKind::Antigravity => {
             let app = crate::antigravity::desktop_app(configured_folder);
             let cli = crate::antigravity::cli_available(configured_folder);
+            let used = if cli.is_some() {
+                Some(ProviderInstallSource::Cli)
+            } else {
+                app.as_ref().map(|_| ProviderInstallSource::App)
+            };
+            (
+                app.as_deref().map(display_fs_path),
+                cli.as_deref().map(display_fs_path),
+                used,
+            )
+        }
+        ProviderKind::Junie => {
+            let cli = crate::junie::central_path(configured_folder);
+            let app = crate::junie::cache_path(configured_folder);
             let used = if cli.is_some() {
                 Some(ProviderInstallSource::Cli)
             } else {
@@ -256,6 +285,7 @@ pub(crate) fn provider_install_status(
                 | ProviderKind::Claude
                 | ProviderKind::Antigravity
                 | ProviderKind::Grok
+                | ProviderKind::Junie
         ),
         checking: false,
     }
@@ -497,6 +527,26 @@ fn persist_opencode_manual_key(
 }
 
 /// Keep the existing credential when validation or the settings commit fails.
+fn persist_muse_session(
+    settings_tx: Sender<Settings>,
+    provider: ProviderId,
+    cookie: Option<&str>,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        provider.kind() == ProviderKind::Muse,
+        "This provider is not Muse."
+    );
+    let rollback = crate::secrets::apply_with_rollback(&[(
+        crate::muse::secret_name(provider.id()),
+        cookie.map(str::to_owned),
+    )])?;
+    if let Err(error) = bump_credentials(settings_tx, provider) {
+        rollback.restore()?;
+        return Err(error);
+    }
+    Ok(())
+}
+
 fn persist_claude_manual_credential(
     settings_tx: Sender<Settings>,
     provider: ProviderId,
@@ -520,6 +570,12 @@ fn persist_claude_manual_credential(
 fn forget_instance_secrets(instance: &ProviderInstance) {
     let provider = instance.provider_id();
     match instance.driver {
+        ProviderKind::Muse => {
+            if let Err(error) = crate::secrets::save(&crate::muse::secret_name(&instance.id), None)
+            {
+                eprintln!("failed to delete the Muse session: {error:#}");
+            }
+        }
         ProviderKind::Claude => {
             if let Err(error) = crate::claude::save_manual_credential(&instance.id, None) {
                 eprintln!("failed to delete the Claude credential: {error:#}");
@@ -654,6 +710,11 @@ fn folder_configs(driver: ProviderKind) -> Vec<FolderConfig> {
             crate::i18n::tr("folder-with-grok-exe-grok-cmd-or-grok-ps1-leave-empty-to-find-it"),
             r"C:\Users\you\.grok\bin",
         )],
+        ProviderKind::Junie => vec![binary(
+            crate::i18n::tr("junie-source-path"),
+            crate::i18n::tr("junie-source-path-help"),
+            r"C:\Users\you\.local\bin",
+        )],
         ProviderKind::Kiro => vec![
             binary(
                 crate::i18n::tr("kiro-ide-folder"),
@@ -679,9 +740,10 @@ fn folder_configs(driver: ProviderKind) -> Vec<FolderConfig> {
                 placeholder: r"C:\Users\you\AppData\Local\kiro-cli",
             },
         ],
-        ProviderKind::OpenCodeZen | ProviderKind::OpenCodeGo | ProviderKind::OpenRouter => {
-            Vec::new()
-        }
+        ProviderKind::OpenCodeZen
+        | ProviderKind::OpenCodeGo
+        | ProviderKind::OpenRouter
+        | ProviderKind::Muse => Vec::new(),
     }
 }
 
@@ -705,6 +767,8 @@ fn provider_description(provider: ProviderKind) -> &'static str {
         ProviderKind::Grok => {
             crate::i18n::tr("reads-supergrok-subscription-credits-from-your-existing-official")
         }
+        ProviderKind::Junie => crate::i18n::tr("junie-provider-help"),
+        ProviderKind::Muse => crate::i18n::tr("muse-provider-help"),
         ProviderKind::Kiro => {
             crate::i18n::tr("fetches-kiro-s-live-monthly-credits-with-its-shared-sign-in-recog")
         }
@@ -727,6 +791,8 @@ fn source_labels(provider: ProviderKind) -> (&'static str, &'static str, &'stati
         ProviderKind::Cursor => (crate::i18n::tr("cursor-app"), "", ""),
         ProviderKind::Antigravity => (crate::i18n::tr("antigravity-app"), "", "agy CLI"),
         ProviderKind::Grok => ("", "", crate::i18n::tr("grok-cli")),
+        ProviderKind::Muse => (crate::i18n::tr("muse-browser-session"), "", ""),
+        ProviderKind::Junie => (crate::i18n::tr("junie-ide-cache"), "", "JetBrains Central"),
         ProviderKind::Kiro => (
             crate::i18n::tr("kiro-ide"),
             crate::i18n::tr("kiro-crew"),

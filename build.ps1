@@ -296,6 +296,7 @@ function New-NsisInstaller {
     $replacements = [ordered]@{
         "{{PRODUCT_NAME}}"  = $ProductName
         "{{VERSION}}"       = $Version
+        "{{NUMERIC_VERSION}}" = (($Version -split "[-+]")[0] + ".0")
         "{{PUBLISHER}}"     = $Publisher
         "{{ARCH}}"          = $ArchName
         "{{OUT_FILE}}"      = ($OutFile -replace '\\', '/')
@@ -371,7 +372,8 @@ try {
             throw "cargo build failed for $triple with exit code $LASTEXITCODE"
         }
 
-        $releaseDir = Join-Path $Root "target\$triple\release"
+        $targetRoot = if ($env:CARGO_TARGET_DIR) { [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR, $Root) } else { Join-Path $Root "target" }
+        $releaseDir = Join-Path $targetRoot "$triple\release"
         $packageName = "codex-minibar-$Version-$archName"
         $packageDir = Join-Path $StageRoot $packageName
 

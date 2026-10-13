@@ -16,6 +16,8 @@ main checkout's warm `target` directory instead of rebuilding all dependencies:
 .\cargo-worktree.ps1 clippy --all-targets --all-features --locked '--' -D warnings
 ```
 
+Set `CARGO_NET_GIT_FETCH_WITH_CLI=true` for the pinned windows-rs dependency, matching CI. `build.ps1` honors `CARGO_TARGET_DIR` for packaging as well as compilation.
+
 The wrapper resolves the main checkout through `git --git-common-dir`, runs Cargo
 in the current worktree, forwards arguments and exit codes, and restores the
 caller's environment. It honors an explicit `CARGO_TARGET_DIR` override. In older
@@ -38,6 +40,8 @@ branch. Do not infer its source worktree from its path. If a branch-specific
 artifact or truly parallel build is required, explicitly use a separate
 `CARGO_TARGET_DIR`. Never launch the app for verification. The wrapper does not
 support `run` or `clean`. Release packaging continues to use `build.ps1`.
+
+Codex account-history storage groups events by the local calendar date. Test query ranges must convert UTC fixture timestamps to `Local` before taking `date_naive()`.
 
 All settings must take effect immediately in the running application. The user must never need to relaunch the app for a setting change to be applied. Keep every open UI surface and affected background component synchronized with the updated settings.
 

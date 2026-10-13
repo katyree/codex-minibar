@@ -159,6 +159,11 @@ pub(crate) fn limit_labels(kind: ProviderKind) -> (&'static str, &'static str, &
             crate::i18n::tr("credits"),
             crate::i18n::tr("credits"),
         ),
+        ProviderKind::Junie => (
+            crate::i18n::tr("junie-ai-credits"),
+            crate::i18n::tr("junie-ai-credits"),
+            crate::i18n::tr("junie-ai-credits"),
+        ),
         ProviderKind::Kiro => (
             crate::i18n::tr("monthly-credits-976559"),
             crate::i18n::tr("credits"),
