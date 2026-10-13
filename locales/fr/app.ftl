@@ -2681,3 +2681,17 @@ junie-source-path = JetBrains quota source path
 junie-source-path-help = Folder containing central.exe, or the IDE configuration folder containing options/AIAssistantQuotaManager2.xml. Leave empty for automatic detection.
 junie-provider-help = Reads JetBrains AI credits shared by Junie and AI Assistant. Central supplies live quota; the IDE cache retains its saved timestamp. Sign in through JetBrains.
 junie-ide-cache = JetBrains IDE quota cache
+
+# Muse personal-agent subscription (muse.ai)
+muse-provider-help = Reads weekly muse.ai subscription usage with a Chrome session credential saved in Windows user storage. This is separate from Muse Code CLI.
+muse-browser-session = Muse Chrome session
+muse-cookie-header = Cookie header value
+muse-cookie-placeholder = Paste the Cookie header value from muse.ai
+muse-chrome-step-one = 1. Sign in to muse.ai in Chrome. Press F12 and select Network, then open Muse Settings → General.
+muse-chrome-step-two = 2. Select the POST request to muse.ai that loads subscription usage. Under Headers → Request Headers, copy only the Cookie value.
+muse-chrome-step-three = 3. Paste it here and choose Check and save. Keep this credential private; replace it here when the session expires.
+muse-session-saved = Session saved with Windows user encryption. Replace it after signing in again if Muse reports that it expired.
+muse-session-missing = Connect your signed-in Muse account from Chrome to read weekly usage.
+muse-remove-session = Remove Muse session
+muse-remove-session-help = Minibar will forget the saved session credential. Your Chrome sign-in stays unchanged.
+muse-session-removed = Muse session removed

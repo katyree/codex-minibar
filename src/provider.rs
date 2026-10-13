@@ -294,6 +294,10 @@ fn start_driver_worker(
                 false
             )
         }
+        ProviderKind::Muse => {
+            let client = || crate::muse::MuseClient::new(&instance.id);
+            start_worker!(client(), client(), crate::muse::MuseActivator, false)
+        }
         ProviderKind::Junie => {
             let client = || crate::junie::JunieClient::new(instance.binary_path.as_deref());
             start_worker!(client(), client(), crate::junie::JunieActivator, false)
@@ -387,6 +391,7 @@ fn provider_activation_path(provider: ProviderId, base_path: PathBuf) -> PathBuf
         ProviderKind::Grok => base_path.with_file_name("activation-grok.toml"),
         ProviderKind::Kiro => base_path.with_file_name("activation-kiro.toml"),
         ProviderKind::Junie => base_path.with_file_name("activation-junie.toml"),
+        ProviderKind::Muse => base_path.with_file_name("activation-muse-ai.toml"),
     }
 }
 

@@ -722,6 +722,7 @@ pub enum ProviderKind {
     Grok,
     Kiro,
     Junie,
+    Muse,
 }
 
 /// How provider instances map onto popup tabs.
@@ -859,7 +860,7 @@ fn new_id(prefix: &str) -> String {
 }
 
 impl ProviderKind {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Codex,
         Self::Claude,
         Self::Cursor,
@@ -870,6 +871,7 @@ impl ProviderKind {
         Self::Grok,
         Self::Kiro,
         Self::Junie,
+        Self::Muse,
     ];
 
     pub const fn id(self) -> &'static str {
@@ -884,6 +886,7 @@ impl ProviderKind {
             Self::Grok => "grok",
             Self::Kiro => "kiro",
             Self::Junie => "junie",
+            Self::Muse => "muse-ai",
         }
     }
 
@@ -899,6 +902,7 @@ impl ProviderKind {
             "grok" => Some(Self::Grok),
             "kiro" => Some(Self::Kiro),
             "junie" => Some(Self::Junie),
+            "muse-ai" => Some(Self::Muse),
             _ => None,
         }
     }
@@ -915,6 +919,7 @@ impl ProviderKind {
             Self::Grok => "Grok",
             Self::Kiro => "Kiro",
             Self::Junie => "Junie",
+            Self::Muse => "Muse",
         }
     }
 

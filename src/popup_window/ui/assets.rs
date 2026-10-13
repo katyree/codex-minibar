@@ -66,6 +66,7 @@ fn source(name: &str) -> Option<&'static str> {
         "grok" => include_str!("../../../assets/icons/grok.svg"),
         "kiro" => include_str!("../../../assets/icons/kiro-iconify.svg"),
         "junie" => include_str!("../../../assets/icons/junie-iconify.svg"),
+        "muse-ai" => include_str!("../../../assets/icons/muse-ai.svg"),
         "chatgpt" => include_str!("../../../assets/icons/chatgpt-iconify.svg"),
         "fluent-folder" => include_str!("../../../assets/icons/fluent-folder-16-filled.svg"),
         "fluent-dismiss" => include_str!("../../../assets/icons/fluent-dismiss-16-regular.svg"),

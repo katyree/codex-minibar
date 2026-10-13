@@ -144,22 +144,43 @@ fn instance_tracker(
         .named(provider.qualified_name())
 }
 
-/// Instances whose worker must be replaced: their read-relevant settings
-/// (paths, credential source, keys, revision) changed.
-pub(super) fn instances_needing_restart(
+/// Clear the old account's quota when its source changes, even while disabled.
+pub(super) fn instances_needing_quota_clear(
     before: &[ProviderInstance],
     after: &[ProviderInstance],
 ) -> Vec<ProviderId> {
     after
         .iter()
-        .filter(|instance| instance.enabled)
         .filter(|instance| {
             before
                 .iter()
                 .find(|old| old.id == instance.id)
-                .is_some_and(|old| old.enabled && old.runtime_key() != instance.runtime_key())
+                .is_some_and(|old| {
+                    // Enabling/disabling alone preserves the same account's cache.
+                    let mut old_source = old.clone();
+                    old_source.enabled = instance.enabled;
+                    old_source.runtime_key() != instance.runtime_key()
+                })
         })
         .map(ProviderInstance::provider_id)
+        .collect()
+}
+
+/// Only already-running workers need replacement. Newly enabled ones start fresh.
+pub(super) fn instances_needing_restart(
+    before: &[ProviderInstance],
+    after: &[ProviderInstance],
+) -> Vec<ProviderId> {
+    instances_needing_quota_clear(before, after)
+        .into_iter()
+        .filter(|provider| {
+            before
+                .iter()
+                .any(|old| old.id == provider.id() && old.enabled)
+                && after
+                    .iter()
+                    .any(|new| new.id == provider.id() && new.enabled)
+        })
         .collect()
 }
 
@@ -275,7 +296,8 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
             let providers_changed = ui.enabled_providers() != settings.enabled_providers()
                 || ui.instances.len() != settings.instances.len();
             let restart = instances_needing_restart(&ui.instances, &settings.instances);
-            for provider in &restart {
+            let clear_quota = instances_needing_quota_clear(&ui.instances, &settings.instances);
+            for provider in &clear_quota {
                 // A replaced credential or path must not present the old
                 // login's quota as the new one's. The matching worker
                 // revision also rejects output already queued by the worker
@@ -283,7 +305,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
                 state.replace_limits(*provider, RateLimits::default());
                 ui.observe_limits_update();
             }
-            if state.apply_openrouter_account_names(&settings) || !restart.is_empty() {
+            if state.apply_openrouter_account_names(&settings) || !clear_quota.is_empty() {
                 // Rename is settings-only. Overlay the new names before the
                 // first paint so the popup does not keep the previous label.
                 ui.observe_limits_update();

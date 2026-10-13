@@ -13,6 +13,7 @@ pub mod junie;
 pub mod kiro;
 pub mod limits;
 pub mod logger;
+pub mod muse;
 pub mod notifications;
 pub mod opencode;
 pub mod openrouter;

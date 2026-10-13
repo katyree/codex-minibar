@@ -36,6 +36,12 @@ pub(crate) enum ProviderDialogKind {
     ManualCredential {
         provider: ProviderId,
     },
+    MuseSession {
+        provider: ProviderId,
+    },
+    RemoveMuseSession {
+        provider: ProviderId,
+    },
     /// `key_id: None` adds a new key slot; `Some` replaces that slot's secret.
     OpenRouterApiKey {
         account_id: String,
@@ -336,6 +342,7 @@ impl SettingsWindow {
             }
             return;
         }
+        self.reset_inputs("dlg-");
         self.provider_dialog = None;
         cx.notify();
     }
@@ -585,6 +592,37 @@ impl SettingsWindow {
                 (
                     crate::i18n::format("sign-in-to-name", &[("name", name.to_string())]),
                     crate::i18n::tr("sign-in"),
+                )
+            }
+            ProviderDialogKind::MuseSession { .. } => {
+                fields.push(self.dialog_input(
+                    k,
+                    FIELD_KEY,
+                    crate::i18n::tr("muse-cookie-header"),
+                    crate::i18n::tr("muse-cookie-placeholder"),
+                    "",
+                    true,
+                    Some(crate::i18n::tr(
+                        "saved-in-windows-user-storage-never-in-the-settings-file",
+                    )),
+                    window,
+                    cx,
+                ));
+                first_input = Some(FIELD_KEY);
+                fields.push(instruction(k, crate::i18n::tr("muse-chrome-step-one")));
+                fields.push(instruction(k, crate::i18n::tr("muse-chrome-step-two")));
+                fields.push(instruction(k, crate::i18n::tr("muse-chrome-step-three")));
+                fields.push(link(k, "muse-sign-in", "muse.ai", "https://muse.ai/"));
+                (
+                    crate::i18n::tr("muse-browser-session").to_owned(),
+                    crate::i18n::tr("check-and-save"),
+                )
+            }
+            ProviderDialogKind::RemoveMuseSession { .. } => {
+                fields.push(instruction(k, crate::i18n::tr("muse-remove-session-help")));
+                (
+                    crate::i18n::tr("muse-remove-session").to_owned(),
+                    crate::i18n::tr("remove"),
                 )
             }
             ProviderDialogKind::ManualCredential { provider } => {
@@ -860,6 +898,7 @@ impl SettingsWindow {
                 | ProviderDialogKind::RemoveOpenRouterApiKey { .. }
                 | ProviderDialogKind::RemoveOpenRouterManagementKey { .. }
                 | ProviderDialogKind::RemoveOpenCodeKey { .. }
+                | ProviderDialogKind::RemoveMuseSession { .. }
         );
         let primary_label = if dialog.checking {
             if dialog.is_sign_in() {
@@ -1122,6 +1161,47 @@ impl SettingsWindow {
                         );
                         let page = super::super::nav::first_provider_page(&this.settings.instances);
                         this.navigate(page, cx);
+                    },
+                );
+            }
+            ProviderDialogKind::MuseSession { provider } => {
+                let cookie = match crate::muse::normalize_cookie(&key) {
+                    Ok(cookie) => cookie,
+                    Err(error) => return self.fail_dialog(error.to_string(), cx),
+                };
+                let control = dialog.login_control.clone();
+                self.run_dialog_then(
+                    cx,
+                    move || {
+                        crate::muse::verify_session(&cookie)?;
+                        control.begin_save()?;
+                        persist_muse_session(settings_tx, provider, Some(&cookie))
+                    },
+                    |this, (), cx| {
+                        this.reload_settings();
+                        this.reset_inputs("dlg-");
+                        this.finish_dialog(
+                            DialogOutcome {
+                                notice: crate::i18n::tr("credential-saved-in-windows-user-storage")
+                                    .into(),
+                            },
+                            cx,
+                        );
+                    },
+                );
+            }
+            ProviderDialogKind::RemoveMuseSession { provider } => {
+                self.run_dialog_then(
+                    cx,
+                    move || persist_muse_session(settings_tx, provider, None),
+                    |this, (), cx| {
+                        this.reload_settings();
+                        this.finish_dialog(
+                            DialogOutcome {
+                                notice: crate::i18n::tr("muse-session-removed").into(),
+                            },
+                            cx,
+                        );
                     },
                 );
             }

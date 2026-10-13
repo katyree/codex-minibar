@@ -443,6 +443,48 @@ impl SettingsWindow {
     ) -> Vec<AnyElement> {
         let provider = instance.provider_id();
         match instance.driver {
+            ProviderKind::Muse => {
+                let configured = crate::muse::session_is_configured(&instance.id);
+                let open = |kind: ProviderDialogKind| {
+                    Self::h(cx, move |this, (), window, cx| {
+                        this.open_provider_dialog(ProviderDialog::new(kind.clone()), window, cx)
+                    })
+                };
+                let mut row = Row::new("muse-session", crate::i18n::tr("muse-browser-session"))
+                    .icon(kit::row_icon(k, "key-fill"))
+                    .description(
+                        k,
+                        crate::i18n::tr(if configured {
+                            "muse-session-saved"
+                        } else {
+                            "muse-session-missing"
+                        }),
+                    )
+                    .trailing(
+                        Button::new(
+                            "muse-connect",
+                            crate::i18n::tr(if configured {
+                                "replace-credential"
+                            } else {
+                                "add-credential"
+                            }),
+                        )
+                        .on_click(open(ProviderDialogKind::MuseSession { provider }))
+                        .render(k),
+                    );
+                if configured {
+                    row = row.trailing(
+                        Button::new("muse-remove", crate::i18n::tr("remove"))
+                            .danger()
+                            .on_click(open(ProviderDialogKind::RemoveMuseSession { provider }))
+                            .render(k),
+                    );
+                }
+                return vec![
+                    kit::section_heading(k, crate::i18n::tr("account")),
+                    kit::row_card(k, row),
+                ];
+            }
             ProviderKind::Claude | ProviderKind::Codex => {}
             ProviderKind::OpenRouter => return self.openrouter_section(instance, k, cx),
             ProviderKind::OpenCodeZen | ProviderKind::OpenCodeGo => {
@@ -560,7 +602,7 @@ impl SettingsWindow {
     ) -> Vec<AnyElement> {
         let provider = instance.provider_id();
         let driver = instance.driver;
-        if driver == ProviderKind::OpenRouter {
+        if matches!(driver, ProviderKind::OpenRouter | ProviderKind::Muse) {
             return Vec::new();
         }
         let mut out = vec![kit::section_header(
