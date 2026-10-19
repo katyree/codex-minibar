@@ -2,7 +2,7 @@
 
 Codex Minibar uses embedded Mozilla Fluent catalogs. English is the source
 language. Complete translations are available in Russian, Brazilian Portuguese,
-Spanish, Simplified Chinese, Traditional Chinese, Japanese, German, and French.
+Spanish, Simplified Chinese, Traditional Chinese, Japanese, German, French, and Korean.
 
 - `locales/en/app.ftl`: existing English copy and full-message templates.
 - `locales/ru/app.ftl`: Russian translations, including plural rules and dates.
@@ -13,6 +13,7 @@ Spanish, Simplified Chinese, Traditional Chinese, Japanese, German, and French.
 - `locales/ja/app.ftl`: Japanese translations.
 - `locales/de/app.ftl`: German translations.
 - `locales/fr/app.ftl`: French translations.
+- `locales/ko-KR/app.ftl`: Korean translations.
 - `locales/template/app.ftl`: empty translator template with English examples.
 - `src/i18n.rs`: language selection, static labels, parameterized messages and fallback.
 - `docs/localization/string-inventory.tsv`: all 4,545 non-test Rust string occurrences
@@ -29,7 +30,7 @@ dialogs follow Windows' own language.
 
 Open Settings > General > Language (Настройки > Общие > Язык). The choices are
 Auto (Windows), English, Русский, Português (Brasil), Español, 简体中文, 日本語,
-Deutsch, Français, and 繁體中文.
+Deutsch, Français, 繁體中文, and 한국어.
 Language names stay in their native spelling so they are recognizable in any
 selected language. Onboarding also offers this setting on its
 General page. Old settings files default to Auto. Auto uses the Windows display
@@ -40,11 +41,13 @@ display languages in Taiwan, Hong Kong, and Macao use the Traditional Chinese
 catalog; mainland China and Singapore use Simplified Chinese. Language tags
 with an explicit `Hant` or `Hans` script take precedence over their region.
 Unqualified `zh` continues to use Simplified Chinese. Japanese, German, and
-French regional variants use their respective catalogs.
+French regional variants use their respective catalogs. Korean display languages
+use the Korean (`ko-KR`) catalog.
 
 Textual dates use day–month order in Russian, Portuguese, and Spanish,
 day–month–year order in German and French, and year–month–day order in Chinese
-and Japanese. Numeric clock/date preferences stay independent.
+and Japanese. Korean dates use `2026년 10월 8일` order and spacing.
+Numeric clock/date preferences stay independent.
 
 Changes immediately refresh app windows. Settings edits use the existing serial
 writer and live synchronization. Tray menus/tooltips, provider error summaries,
@@ -90,11 +93,11 @@ concatenating fragments. Fluent selectors handle Russian one/few/many forms for
 requests, sessions, API keys, banked resets, and login-expiry days. Portuguese
 and Spanish use one/other forms. German uses one/other forms; French also treats
 zero as singular and uses the many category for exact millions. Chinese and
-Japanese use invariant count phrases.
+Japanese and Korean use invariant count phrases.
 Numeric selectors
 must receive numbers: the resolver recognizes these messages' count parameters.
 
-Add the English source first, update all eight translation catalogs, then regenerate the
+Add the English source first, update all translation catalogs, then regenerate the
 translator template:
 
 ```powershell
@@ -126,7 +129,7 @@ cargo test --all-targets --all-features --locked
 ```
 
 Localization tests validate Fluent syntax, unique IDs, exact message and parameter
-parity across all nine catalogs, template coverage, literal translation call sites,
+parity across all ten catalogs, template coverage, literal translation call sites,
 plural forms, per-message fallback in every translated language, settings
 round-trips, language-selection indices, display-language detection, textual dates,
 and preservation of parameter values. Every catalog is resolved directly for
@@ -136,11 +139,11 @@ For manual QA, select each translated language and inspect every Settings tab, o
 provider pages and dialogs, popup Home/Usage/provider tabs, chart tooltips, tray
 menus and notifications. Switch back to English while the popup is open, check
 theme flips and provider combinations, and verify longer German/French/Portuguese/Spanish
-copy and Chinese/Japanese glyphs fit.
+copy and Chinese/Japanese/Korean glyphs fit.
 Also switch directly between translated languages while Home/Usage
 charts and tray menus are visible to check their language-dependent caches. The
 implementation was checked without launching the application; visual QA is pending.
 
-The Japanese, German, and French catalogs started from machine translation, with
+The Japanese, German, French, and Korean catalogs started from machine translation, with
 reviewed corrections to UI terminology, full messages, plural forms, dates, and
 technical names. Native-speaker proofreading is still recommended.
