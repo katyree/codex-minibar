@@ -1,0 +1,2 @@
+- Taskbar widgets now work with the Windows 10 taskbar and ExplorerPatcher: they no longer cover app buttons
+- Taskbar widgets hide when the taskbar has no room left, instead of expanding over everything

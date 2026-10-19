@@ -43,7 +43,7 @@ pub(super) fn format_last_activation(
         .unwrap_or_else(|| crate::i18n::tr("never").into())
 }
 
-pub(super) fn format_token_count(tokens: u64) -> String {
+pub(crate) fn format_token_count(tokens: u64) -> String {
     match tokens {
         0..=999 => tokens.to_string(),
         1_000..=999_999 => format!("{:.1}K", tokens as f64 / 1_000.0),
@@ -52,7 +52,7 @@ pub(super) fn format_token_count(tokens: u64) -> String {
     }
 }
 
-pub(super) fn format_usd(value: f64) -> String {
+pub(crate) fn format_usd(value: f64) -> String {
     let amount = format!("{value:.2}");
     let Some((dollars, cents)) = amount.split_once('.') else {
         return format!("${amount}");
@@ -106,7 +106,7 @@ pub(crate) fn capitalize_plan_name(plan: &str) -> String {
     )
 }
 
-pub(super) fn format_reset_in(reset: Option<DateTime<Utc>>) -> String {
+pub(crate) fn format_reset_in(reset: Option<DateTime<Utc>>) -> String {
     let Some(reset) = reset else {
         return crate::i18n::tr("unavailable").into();
     };

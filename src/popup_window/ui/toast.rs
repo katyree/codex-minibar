@@ -12,14 +12,15 @@
 use std::{
     cell::RefCell,
     rc::Rc,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use gpui::{
     AnyElement, AppContext, AsyncApp, Bounds, ClickEvent, Context, Div, Hsla, InteractiveElement,
-    IntoElement, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
-    WindowBackgroundAppearance, WindowBounds, WindowHandle, WindowKind, WindowOptions, div, point,
-    px, relative, size,
+    IntoElement, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled,
+    StyledImage as _, Window, WindowBackgroundAppearance, WindowBounds, WindowHandle, WindowKind,
+    WindowOptions, div, point, prelude::FluentBuilder as _, px, relative, size,
 };
 
 use crate::{
@@ -40,10 +41,16 @@ use super::{
 };
 
 const CARD_WIDTH: f32 = 360.0;
+/// Card shadow. GPUI's blur radius is the Gaussian sigma; past two sigmas
+/// the shadow is invisible, so the host region keeps that much around cards.
+const SHADOW_BLUR: f32 = 12.0;
+const SHADOW_OFFSET: f32 = 4.0;
+const SHADOW_REACH: f32 = SHADOW_BLUR * 2.0;
 /// Room around the cards for their shadow.
-const EDGE: f32 = 16.0;
+const EDGE: f32 = SHADOW_REACH + SHADOW_OFFSET;
 const GAP: f32 = 8.0;
-const HOST_HEIGHT: f32 = 620.0;
+/// Tall enough for a release summary with its hero image and button.
+const HOST_HEIGHT: f32 = 900.0;
 const MAX_CARDS: usize = 4;
 /// Inner padding, as on popup pages.
 const PADDING: f32 = 12.0;
@@ -77,6 +84,23 @@ const PROGRESS_GAP: f32 = 10.0;
 /// One sweep of an indeterminate bar, and the share of the track it covers.
 const SWEEP: Duration = Duration::from_millis(1600);
 const SWEEP_WIDTH: f32 = 0.35;
+/// A taller release summary scrolls inside the card.
+const SUMMARY_MAX_HEIGHT: f32 = 360.0;
+/// The scrolling summary never shrinks below this on a short screen.
+const MIN_SUMMARY_HEIGHT: f32 = 80.0;
+/// Release summaries use the card's full inner width.
+const SUMMARY_WIDTH: f32 = CARD_WIDTH - BORDER * 2.0 - PADDING * 2.0 - INSET;
+/// A summary's first image spans the top of the card, edge to edge.
+const HERO_WIDTH: f32 = CARD_WIDTH - BORDER * 2.0;
+const HERO_HEIGHT: f32 = 250.0;
+/// Travel before a press becomes a swipe instead of a click.
+const SWIPE_SLOP: f32 = 6.0;
+/// A swipe this far right, or released moving right this fast (px/ms),
+/// closes the card.
+const SWIPE_DISMISS: f32 = CARD_WIDTH * 0.3;
+const SWIPE_FLING: f32 = 0.6;
+/// Leftward drags only give a little: cards leave to the right.
+const SWIPE_LEFT_RESISTANCE: f32 = 0.2;
 
 thread_local! {
     static HOST: RefCell<Option<WindowHandle<ToastHost>>> = const { RefCell::new(None) };
@@ -86,11 +110,22 @@ struct Card {
     id: u64,
     notification: Notification,
     height: f32,
+    /// Height of the release summary's scroll area, when it has one.
+    summary_height: f32,
+    /// The summary's first image, cropped for the top of the card, and the
+    /// index of the block it came from.
+    hero: Option<(usize, Arc<gpui::RenderImage>)>,
     born: Instant,
     /// Lifetime used so far; it does not grow while hovered.
     shown: Duration,
     last_tick: Instant,
     hovered: bool,
+    /// The pointer (mouse, pen or touch) holding the card for a swipe.
+    drag: Option<Drag>,
+    /// Horizontal offset the card rests at: 0, or where a swipe let go.
+    swiped: f32,
+    /// The last press became a swipe; its click must not close the card.
+    swallow_click: bool,
     /// Kept until closed by hand, e.g. after opening the release notes.
     pinned: bool,
     leaving: Option<Instant>,
@@ -130,6 +165,19 @@ pub(crate) struct ToastHost {
     hwnd: Option<windows_sys::Win32::Foundation::HWND>,
     #[cfg(windows)]
     last_region: Vec<super::win32::Rect>,
+}
+
+#[derive(Clone, Copy)]
+struct Drag {
+    /// Pointer x when pressed, in host coordinates.
+    start: f32,
+    /// Current offset, after resistance.
+    offset: f32,
+    moved: bool,
+    /// Latest pointer x and when it was seen, for the release speed.
+    last: (f32, Instant),
+    /// Pointer speed in px/ms, positive to the right.
+    velocity: f32,
 }
 
 fn progress(elapsed: Duration, duration: Duration) -> f32 {
@@ -276,11 +324,21 @@ impl ToastHost {
             })
     }
 
-    /// Card height for `notification`, from the same metrics the card is
-    /// laid out with. Cards have a fixed height so the stack can glide
-    /// without waiting for layout.
-    fn measure(&self, notification: &Notification, window: &Window, palette: &Palette) -> f32 {
+    /// Card height for `notification`, and the height of its summary area,
+    /// from the same metrics the card is laid out with. Cards have a fixed
+    /// height so the stack can glide without waiting for layout.
+    fn measure(
+        &self,
+        notification: &Notification,
+        hero: Option<usize>,
+        window: &Window,
+        palette: &Palette,
+    ) -> (f32, f32) {
+        let mut summary_height = 0.0;
         let mut height = BORDER * 2.0 + PADDING * 2.0 + LINE;
+        if hero.is_some() {
+            height += HERO_HEIGHT;
+        }
         let alert = notification.limits.as_deref();
         if alert.is_none() && !notification.body.trim().is_empty() {
             let width =
@@ -288,8 +346,28 @@ impl ToastHost {
             let lines = body_lines(window, &notification.body, width, &palette.font_family);
             height += BODY_GAP + lines as f32 * LINE;
         }
+        if let Some(summary) = notification.summary.as_deref() {
+            let natural = super::toast_summary::measure(
+                window,
+                summary,
+                SUMMARY_WIDTH,
+                &palette.font_family,
+                hero,
+            );
+            summary_height = natural.min(SUMMARY_MAX_HEIGHT);
+            height += SECTION_GAP + summary_height;
+        }
         if !notification.actions.is_empty() {
             height += SECTION_GAP + BUTTON_HEIGHT;
+        }
+        // The host is bottom-anchored and may be shorter than HOST_HEIGHT on
+        // a small work area: shrink the scrolling summary so the card never
+        // grows past the top edge, where it would be cropped.
+        let room = HOST_HEIGHT.min(f32::from(window.viewport_size().height)) - EDGE * 2.0;
+        if summary_height > 0.0 && height > room {
+            let shrunk = (summary_height - (height - room)).max(MIN_SUMMARY_HEIGHT);
+            height -= summary_height - shrunk;
+            summary_height = shrunk;
         }
         if notification.progress.is_some() {
             height += PROGRESS_GAP + components::PROGRESS_TRACK_HEIGHT;
@@ -298,7 +376,7 @@ impl ToastHost {
             let rows = quota_rows(alert).len() as f32;
             height += SECTION_GAP + LINE + rows * (palette.card_gap + LIMIT_CARD);
         }
-        height
+        (height, summary_height)
     }
 
     /// Adds a card. Returns the native work to do outside this borrow when
@@ -310,7 +388,16 @@ impl ToastHost {
         cx: &mut Context<Self>,
     ) -> bool {
         let palette = self.palette(window, cx);
-        let height = self.measure(&notification, window, &palette);
+        let hero = notification
+            .summary
+            .as_deref()
+            .and_then(|summary| super::toast_summary::hero(summary, HERO_WIDTH, HERO_HEIGHT));
+        let (height, summary_height) = self.measure(
+            &notification,
+            hero.as_ref().map(|(index, _)| *index),
+            window,
+            &palette,
+        );
         let now = Instant::now();
         if let Some(key) = notification.key {
             let finished = notification.progress.is_none();
@@ -320,14 +407,20 @@ impl ToastHost {
                 .iter_mut()
                 .find(|card| card.leaving.is_none() && card.notification.key == Some(key))
             {
-                if finished {
+                // A finished operation sounds once; a summary filling in an
+                // already finished card stays quiet.
+                if finished && card.notification.progress.is_some() {
                     crate::notifications::play_sound(&notification);
                     // The result gets its full lifetime from now.
                     card.shown = Duration::ZERO;
                     card.last_tick = now;
                 }
+                // A summary is read at leisure: it stays until closed.
+                card.pinned |= notification.summary.is_some();
                 card.notification = notification;
                 card.height = height;
+                card.summary_height = summary_height;
+                card.hero = hero;
                 cx.notify();
                 return false;
             }
@@ -348,15 +441,21 @@ impl ToastHost {
                 || card.notification.body != notification.body
         });
         self.next_id += 1;
+        let pinned = notification.summary.is_some();
         self.cards.push(Card {
             id: self.next_id,
             notification,
             height,
+            summary_height,
+            hero,
             born: now,
             shown: Duration::ZERO,
             last_tick: now,
             hovered: false,
-            pinned: false,
+            drag: None,
+            swiped: 0.0,
+            swallow_click: false,
+            pinned,
             leaving: None,
         });
         // Too many: the oldest ones leave early.
@@ -407,6 +506,76 @@ impl ToastHost {
         }
     }
 
+    fn begin_drag(&mut self, id: u64, x: f32, cx: &mut Context<Self>) {
+        if let Some(card) = self
+            .cards
+            .iter_mut()
+            .find(|card| card.id == id && card.leaving.is_none())
+        {
+            card.swallow_click = false;
+            card.drag = Some(Drag {
+                start: x,
+                offset: 0.0,
+                moved: false,
+                last: (x, Instant::now()),
+                velocity: 0.0,
+            });
+            cx.notify();
+        }
+    }
+
+    /// Follows the pointer holding a card.
+    fn drag_to(&mut self, x: f32, cx: &mut Context<Self>) {
+        let Some(drag) = self.cards.iter_mut().find_map(|card| card.drag.as_mut()) else {
+            return;
+        };
+        let now = Instant::now();
+        let elapsed = now.saturating_duration_since(drag.last.1).as_secs_f32() * 1000.0;
+        if elapsed > 0.0 {
+            drag.velocity = (x - drag.last.0) / elapsed;
+        }
+        drag.last = (x, now);
+        let delta = x - drag.start;
+        drag.moved |= delta.abs() > SWIPE_SLOP;
+        drag.offset = if delta < 0.0 {
+            delta * SWIPE_LEFT_RESISTANCE
+        } else {
+            delta
+        };
+        cx.notify();
+    }
+
+    /// Lets go of the held card: far or fast enough closes it, otherwise it
+    /// springs back.
+    fn end_drag(&mut self, cx: &mut Context<Self>) {
+        let Some(card) = self.cards.iter_mut().find(|card| card.drag.is_some()) else {
+            return;
+        };
+        let Some(drag) = card.drag.take() else {
+            return;
+        };
+        card.swallow_click = drag.moved;
+        let recent = drag.last.1.elapsed() < Duration::from_millis(80);
+        let fling = recent && drag.velocity > SWIPE_FLING;
+        if drag.moved && (drag.offset > SWIPE_DISMISS || fling) && card.leaving.is_none() {
+            card.swiped = drag.offset.max(0.0);
+            card.leaving = Some(Instant::now());
+        }
+        cx.notify();
+    }
+
+    /// A click closes the card, unless the press was a swipe.
+    fn click(&mut self, id: u64, cx: &mut Context<Self>) {
+        let swiped = self
+            .cards
+            .iter_mut()
+            .find(|card| card.id == id)
+            .is_some_and(|card| std::mem::take(&mut card.swallow_click));
+        if !swiped {
+            self.dismiss(id, cx);
+        }
+    }
+
     fn set_hovered(&mut self, id: u64, hovered: bool, cx: &mut Context<Self>) {
         if let Some(card) = self.cards.iter_mut().find(|card| card.id == id) {
             card.hovered = hovered;
@@ -422,7 +591,8 @@ impl ToastHost {
             let entered = !animate || now.saturating_duration_since(card.born) >= ENTER;
             // A card with progress waits for its operation's result.
             let running = card.notification.progress.is_some();
-            if card.leaving.is_none() && !card.hovered && !card.pinned && !running && entered {
+            let held = card.hovered || card.drag.is_some();
+            if card.leaving.is_none() && !held && !card.pinned && !running && entered {
                 card.shown += delta;
                 if card.shown >= card.notification.lifetime() {
                     card.leaving = Some(now);
@@ -514,6 +684,11 @@ impl Render for ToastHost {
         #[cfg(windows)]
         let mut region = Vec::with_capacity(self.cards.len());
         let scale = window.scale_factor();
+        // The host can reach past the work area; the shadow stops at its
+        // bottom so it never makes the taskbar unclickable.
+        #[cfg(windows)]
+        let floor = f32::from(window.viewport_size().height)
+            - (EDGE - crate::popup::EDGE_MARGIN_PX as f32 / scale).max(0.0);
         for (card, (y, height)) in self.cards.iter().zip(frames) {
             let age = now.saturating_duration_since(card.born);
             let (enter, exit) = if animate {
@@ -529,18 +704,30 @@ impl Render for ToastHost {
             let enter_eased = fx::ease_out_cubic(enter);
             let exit_eased = fx::ease_out_cubic(exit);
             let slide = (1.0 - enter_eased) * (CARD_WIDTH * 0.3) + exit_eased * (CARD_WIDTH * 0.25);
-            let alpha = (enter * 2.0).min(1.0) * (1.0 - exit_eased);
-            let x = EDGE + slide;
+            // A held card follows the pointer; let go, it springs back or
+            // leaves from where it was swiped to.
+            let drag_key = fx::key(("toast-drag", card.id));
+            let offset = match card.drag {
+                Some(drag) => {
+                    self.fx.snap(drag_key, drag.offset);
+                    drag.offset
+                }
+                None => self.fx.value(drag_key, card.swiped, fx::NORMAL),
+            };
+            let fade = 1.0 - (offset.max(0.0) / CARD_WIDTH).min(1.0) * 0.6;
+            let alpha = (enter * 2.0).min(1.0) * (1.0 - exit_eased) * fade;
+            let x = EDGE + slide + offset;
             #[cfg(windows)]
             if alpha > 0.0 {
-                // Visible part only: the card slides out past the host edge.
-                let left = ((x - 4.0) * scale).floor() as i32;
-                let right = ((EDGE + CARD_WIDTH + 4.0) * scale).ceil() as i32;
+                // Card and shadow; the card slides out past the host edge.
+                let left = ((x - SHADOW_REACH).max(0.0) * scale).floor() as i32;
+                let right = ((EDGE * 2.0 + CARD_WIDTH) * scale).ceil() as i32;
+                let bottom = (y + height + SHADOW_OFFSET + SHADOW_REACH).min(floor);
                 region.push(super::win32::Rect {
                     left,
-                    top: ((y - 4.0) * scale).floor() as i32,
+                    top: ((y + SHADOW_OFFSET - SHADOW_REACH) * scale).floor() as i32,
                     right: right.max(left),
-                    bottom: ((y + height + 8.0) * scale).ceil() as i32,
+                    bottom: (bottom * scale).ceil() as i32,
                 });
             }
             let hover = self
@@ -558,6 +745,12 @@ impl Render for ToastHost {
                     animate.then(|| sweep_cycle(now.saturating_duration_since(card.born))),
                 ),
             });
+            let summary = if card.notification.summary.is_some() {
+                self.fx
+                    .appear(fx::key(("toast-summary", card.id)), fx::NORMAL)
+            } else {
+                0.0
+            };
             elements.push(self.card(
                 card,
                 CardFrame {
@@ -568,6 +761,7 @@ impl Render for ToastHost {
                     hover,
                     age: animate.then_some(age),
                     progress,
+                    summary,
                 },
                 prefs,
                 &palette,
@@ -586,12 +780,45 @@ impl Render for ToastHost {
         if animating || self.fx.is_animating() {
             window.request_animation_frame();
         }
+        // The window captures the pointer while it is pressed, so a swipe is
+        // followed even past the card or the host's edge.
+        let host = cx.entity().downgrade();
+        let swipes = gpui::canvas(
+            |_, _, _| {},
+            move |_, _, window, _| {
+                let moves = host.clone();
+                window.on_mouse_event(move |event: &gpui::MouseMoveEvent, phase, _, cx| {
+                    if phase != gpui::DispatchPhase::Capture {
+                        return;
+                    }
+                    let _ = moves.update(cx, |this, cx| {
+                        if event.pressed_button == Some(gpui::MouseButton::Left) {
+                            this.drag_to(f32::from(event.position.x), cx);
+                        } else {
+                            // Released where no up event reached us.
+                            this.end_drag(cx);
+                        }
+                    });
+                });
+                let ups = host.clone();
+                window.on_mouse_event(move |event: &gpui::MouseUpEvent, phase, _, cx| {
+                    if phase == gpui::DispatchPhase::Capture
+                        && event.button == gpui::MouseButton::Left
+                    {
+                        let _ = ups.update(cx, |this, cx| this.end_drag(cx));
+                    }
+                });
+            },
+        )
+        .absolute()
+        .size_full();
         div()
             .size_full()
             .relative()
             .font_family(palette.font_family.clone())
             .text_color(palette.text_primary)
             .children(elements)
+            .child(swipes)
     }
 }
 
@@ -605,6 +832,8 @@ struct CardFrame {
     /// Time since the card appeared; `None` when motion is off.
     age: Option<Duration>,
     progress: Option<BarFrame>,
+    /// Opacity of the release summary; it fades in when it fills a card.
+    summary: f32,
 }
 
 /// Per-frame state of a card's progress bar.
@@ -693,23 +922,27 @@ impl ToastHost {
                     .line_clamp(BODY_MAX_LINES),
             );
         }
+        let summary = notification.summary.as_deref();
+        let mut buttons = None;
         if !notification.actions.is_empty() {
-            let buttons =
-                notification
-                    .actions
-                    .iter()
-                    .enumerate()
-                    .map(|(index, (label, action))| {
-                        self.button(id, index, label, action.clone(), palette, cx)
-                    });
-            text = text.child(
+            buttons = Some(
                 div()
                     .mt(px(SECTION_GAP))
                     .flex()
                     .flex_row()
                     .gap(px(8.0))
-                    .children(buttons),
+                    .children(notification.actions.iter().enumerate().map(
+                        |(index, (label, action))| {
+                            self.button(id, index, label, action.clone(), palette, cx)
+                        },
+                    )),
             );
+        }
+        // With a summary the buttons go under it, at the card's edge.
+        if summary.is_none()
+            && let Some(buttons) = buttons.take()
+        {
+            text = text.child(buttons);
         }
         if let Some(bar) = frame.progress {
             text = text.child(progress_bar(bar, palette).mt(px(PROGRESS_GAP)));
@@ -725,6 +958,10 @@ impl ToastHost {
             .flex()
             .items_center()
             .justify_center()
+            // Stays legible over the summary's image.
+            .when(card.hero.is_some(), |close| {
+                close.bg(palette.solid_background.opacity(0.85))
+            })
             .hover(|style| style.bg(palette.subtle_fill))
             .child(components::icon(
                 "fluent-dismiss",
@@ -738,7 +975,25 @@ impl ToastHost {
                 this.dismiss(id, cx);
             }));
 
-        let mut content = div().flex().flex_col().child(
+        let radius = crate::popup::corner_radius_dip() as f32;
+        let hero = card.hero.as_ref().map(|(_, image)| {
+            // Out through the padding to the border, and back in below.
+            div()
+                .mt(px(-PADDING))
+                .mx(px(-PADDING))
+                .mb(px(PADDING))
+                .w(px(HERO_WIDTH))
+                .h(px(HERO_HEIGHT))
+                .flex_none()
+                .opacity(frame.summary)
+                .child(
+                    gpui::img(Arc::clone(image))
+                        .size_full()
+                        .object_fit(gpui::ObjectFit::Fill)
+                        .rounded_t(px((radius - BORDER).max(0.0))),
+                )
+        });
+        let mut content = div().flex().flex_col().children(hero).child(
             div()
                 .flex()
                 .flex_row()
@@ -762,6 +1017,25 @@ impl ToastHost {
                 palette,
             ));
         }
+        if let Some(summary) = summary {
+            let skip = card.hero.as_ref().map(|(index, _)| *index);
+            let column = super::toast_summary::render(id, summary, SUMMARY_WIDTH, skip, palette);
+            // Fixed at its measured height; a taller summary scrolls.
+            content = content.child(
+                div()
+                    .id(SharedString::from(format!("toast-{id}-summary")))
+                    .mt(px(SECTION_GAP))
+                    .pl(px(INSET))
+                    .h(px(card.summary_height))
+                    .flex_none()
+                    .overflow_y_scroll()
+                    .opacity(frame.summary)
+                    .child(column),
+            );
+            if let Some(buttons) = buttons.take() {
+                content = content.child(buttons.pl(px(INSET)));
+            }
+        }
 
         div()
             .id(SharedString::from(format!("toast-{id}")))
@@ -783,16 +1057,24 @@ impl ToastHost {
             })
             .shadow(vec![gpui::BoxShadow {
                 color: gpui::black().alpha(if palette.dark { 0.3 } else { 0.14 }),
-                offset: point(px(0.0), px(4.0)),
-                blur_radius: px(12.0),
+                offset: point(px(0.0), px(SHADOW_OFFSET)),
+                blur_radius: px(SHADOW_BLUR),
                 spread_radius: px(0.0),
             }])
             .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
                 this.set_hovered(id, *hovered, cx);
             }))
+            .on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(move |this, event: &gpui::MouseDownEvent, _, cx| {
+                    this.begin_drag(id, f32::from(event.position.x), cx);
+                }),
+            )
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                this.dismiss(id, cx);
+                this.click(id, cx);
             }))
+            // The summary follows the height glide instead of spilling past it.
+            .when(summary.is_some(), |card| card.overflow_hidden())
             .child(content)
             .child(close)
             .into_any_element()

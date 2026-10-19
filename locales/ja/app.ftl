@@ -1199,6 +1199,12 @@ found-an-official-grok-cli-sign-in-on-this-pc = この PC で公式 Grok CLI サ
 not-found-run-grok-login-before-enabling-it = 見つかりません。有効にする前に grok login を実行してください。
 
 # src/settings_window/onboarding.rs
+found-an-official-command-code-cli-sign-in-on-this-pc = この PC で公式 Command Code CLI サインインが見つかりました。
+
+# src/settings_window/onboarding.rs
+not-found-run-cmdc-login-before-enabling-it = 見つかりません。有効にする前に cmdc login を実行してください。
+
+# src/settings_window/onboarding.rs
 found-kiro-ide-kiro-crew-or-a-signed-in-kiro-cli = Kiro IDE、Kiro Crew、またはサインインした Kiro CLI が見つかりました。
 
 # src/settings_window/onboarding.rs
@@ -1825,6 +1831,9 @@ cursor-app-folder = Cursorアプリフォルダー
 grok-cli-folder = Grok CLI フォルダー
 
 # src/settings_window/providers.rs
+command-code-cli-folder = Command Code CLI フォルダー
+
+# src/settings_window/providers.rs
 kiro-ide-folder = Kiro IDE フォルダー
 
 # src/settings_window/providers.rs
@@ -1858,6 +1867,9 @@ reads-subscription-quota-from-your-existing-official-agy-windows = 既存の公�
 reads-supergrok-subscription-credits-from-your-existing-official = 既存の公式 Grok CLI サインインから SuperGrok サブスクリプション クレジットを読み取ります。
 
 # src/settings_window/providers.rs
+reads-command-code-5h-weekly-and-monthly-credits-from-your-existin = 既存の公式 CLI サインインから Command Code の 5 時間、週次、月次クレジットを読み取ります。
+
+# src/settings_window/providers.rs
 fetches-kiro-s-live-monthly-credits-with-its-shared-sign-in-recog = 共有サインインを使用して、Kiro のライブ月間クレジットを取得します。 IDE、Crew、および CLI インストールを認識します。
 
 # src/settings_window/providers.rs
@@ -1880,6 +1892,9 @@ antigravity-app = Antigravityアプリ
 
 # src/settings_window/providers.rs
 grok-cli = Grok CLI
+
+# src/settings_window/providers.rs
+command-code-cli = Command Code CLI
 
 # src/settings_window/providers.rs
 kiro-ide = Kiro IDE
@@ -2187,6 +2202,9 @@ folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut = agy.exe、ag
 # application
 folder-with-grok-exe-grok-cmd-or-grok-ps1-leave-empty-to-find-it = grok.exe、grok.cmd、または grok.ps1 のフォルダー。自動的に検索されるようにするには、空のままにします。
 
+# src/settings_window/providers.rs
+folder-with-cmdc-cmd-or-cmdc-ps1-leave-empty-to-find-it-automati = cmdc.cmd または cmdc.ps1 のフォルダー。自動的に検索されるようにするには、空のままにします。
+
 # application
 folder-containing-kiro-exe-or-the-executable-itself-leave-empty-t = Kiro.exe を含むフォルダー、または実行可能ファイル自体。自動的に検索されるようにするには、空のままにします。
 
@@ -2442,7 +2460,7 @@ openrouter-keys-enabled = 有効
 openrouter-keys-delete = 削除
 
 
-openrouter-keys-delete-tracked = このアプリが使用中のキーです。先に設定で削除してください。
+openrouter-keys-delete-tracked = Minibar での追跡も停止します。
 
 
 openrouter-keys-saving = 保存中…
@@ -2551,6 +2569,24 @@ openrouter-keys-not-a-management-key = このキーは他のキーを管理で�
 
 
 openrouter-keys-key-not-found = このキーはもう存在しません。
+
+
+openrouter-keys-untrack = アプリから削除
+
+
+openrouter-keys-untracking = 削除中…
+
+
+openrouter-keys-untrack-title = 「{ $name }」の追跡を停止しますか？
+
+
+openrouter-keys-untrack-message = Minibar はこのキーを忘れます。OpenRouter ではそのまま使えます。
+
+
+openrouter-keys-tracked-here = Minibar がこのキーを追跡しています。
+
+
+openrouter-keys-manage-hint = キーを作成・編集・削除するには、設定で管理キーを追加してください。
 
 # src/settings_window/notifications.rs
 notification-sounds = 通知音
@@ -2667,3 +2703,208 @@ muse-session-missing = Connect your signed-in Muse account from Chrome to read w
 muse-remove-session = Remove Muse session
 muse-remove-session-help = Minibar will forget the saved session credential. Your Chrome sign-in stays unchanged.
 muse-session-removed = Muse session removed
+# src/whats_new.rs
+no-summary-for-this-version = このバージョンの概要はまだありません。詳しいリリースノートは GitHub にあります。
+
+# src/whats_new.rs
+couldn-t-load-what-s-new = 新機能を読み込めませんでした。接続を確認するか、GitHub のリリースノートをご覧ください。
+
+# src/whats_new.rs
+full-release-notes = 詳しいリリースノート
+
+# src/settings_window/about.rs
+show-what-s-new-after-updating = アップデート後に新機能を表示
+
+# src/settings_window/about.rs
+a-short-summary-of-the-release-once-it-s-installed = インストール後にリリースの概要を表示します。
+
+# src/settings_window/about.rs
+view = 表示
+
+# src/settings_window/general.rs
+popup-shortcut = ポップアップのショートカット
+popup-shortcut-description = Windows のどこからでも押すと、ポップアップを表示または非表示にします。
+shortcut-not-set = 未設定
+press-a-shortcut = ショートカットを押してください…
+popup-shortcut-recording-hint = Esc でキャンセル、Backspace でショートカットを削除します。
+popup-shortcut-needs-modifier = Ctrl、Alt、Win のいずれかを含めるか、F13〜F24 を使ってください。
+popup-shortcut-in-use = このショートカットは別のアプリで使用されています。別の組み合わせを選んでください。
+clear-shortcut = ショートカットを削除
+taskbar = タスク バー
+preview = プレビュー
+taskbar-page-caption = Windows のタスク バー内、時計の横に描画されるライブ使用状況ウィジェットです。タスク バーのテーマに従い、クリックするとそのプロバイダーのポップアップが開きます。
+taskbar-show-widgets = タスク バーにウィジェットを表示
+taskbar-show-widgets-description = 以下のウィジェットを Windows のタスク バー内に描画します。
+taskbar-position = 位置
+taskbar-position-description = タスク バー上のウィジェットの位置です。先頭はアイコンを中央揃えにしている場合に最適です。
+taskbar-position-tray = 通知領域の横
+taskbar-position-start = タスク バーの先頭
+taskbar-widgets = ウィジェット
+taskbar-no-widgets = ウィジェットはまだありません
+taskbar-no-widgets-description = ウィジェットを追加すると、タスク バーに利用枠を表示できます。
+taskbar-show-provider-icon = プロバイダーのアイコンを表示
+taskbar-style-glance = ひと目
+taskbar-style-glance-hint = 天気ボタンのように、プロバイダーのアイコンと 2 行のテキストを表示します。
+taskbar-style-rings-hint = 利用枠ごとのプログレス リングと、その横の値を表示します。
+taskbar-style-bars-hint = プロバイダーのアイコンの横に細いプログレス バーを重ねて表示します。
+taskbar-menu-open = Codex Minibar を開く
+taskbar-menu-settings = タスク バー ウィジェットの設定
+taskbar-menu-hide = タスク バー ウィジェットを非表示
+taskbar-card-left = 残り { $value }
+taskbar-card-used = { $value } 使用済み
+taskbar-card-resets = { $time } 後にリセット · { $clock }
+taskbar-card-no-data = データを待機中
+short-5h = 5時間
+short-7d = 7日
+taskbar-style-nested = 入れ子のリング
+taskbar-style-dials = ダイヤル
+taskbar-style-meters = メーター
+taskbar-style-nested-hint = 1 つ分のスペースに同心円のリング。必要なら横に値を表示します。
+taskbar-style-dials-hint = クォータごとの小さなリングで、中に数値を表示します。
+taskbar-style-meters-hint = バッテリー表示のような細いレベルの柱。
+taskbar-show-provider-icon-description = ウィジェットの先頭にプロバイダーのマークを表示します。
+taskbar-show-labels = ラベルを表示
+taskbar-show-labels-description = 値の横に 5時間、7日 などの短い名前を表示します。
+taskbar-show-values = パーセントを表示
+taskbar-show-values-description = ウィジェット上のクォータのパーセント。
+taskbar-show-pace = ペースを表示
+taskbar-show-pace-description = 均等に消費した場合の現在の使用量の位置に印を付けます。
+taskbar-menu-edit = このウィジェットを編集
+taskbar-content = 内容
+taskbar-content-hint = ウィジェットがグラフィックの横に表示する内容。
+taskbar-reset-time = リセット時刻
+taskbar-reset-time-description = 各クォータがリセットされるタイミング。
+taskbar-reset-off = 表示しない
+taskbar-reset-countdown = 残り時間
+taskbar-reset-clock = 時刻
+taskbar-cycle = マウスホイールでウィジェットを切り替え
+taskbar-cycle-description = ウィジェットを 1 つずつ表示し、その上でホイールを回すと次に切り替わります。
+taskbar-card-tokens = { $count } トークン
+taskbar-click = クリックで開く
+taskbar-click-description = ウィジェットをクリックしたときに開くポップアップのページ。
+taskbar-click-nearest = ホーム（なければプロバイダーのタブ）
+taskbar-click-tab = プロバイダーのタブ
+taskbar-click-home = ホーム
+
+# src/settings_window/notifications.rs
+follow-do-not-disturb = 応答不可モード中は一時停止
+
+# src/settings_window/notifications.rs
+follow-do-not-disturb-description = Windows の応答不可モードまたは集中モードがオンの間、通知を表示せず音も鳴らしません。自分で開始した操作の結果は表示されます。
+
+# src/settings_window/advanced.rs
+performance = パフォーマンス
+
+# src/settings_window/advanced.rs
+game-mode = ゲームモード
+
+# src/settings_window/advanced.rs
+game-mode-description = 制限と使用状況の確認頻度を下げ、低い優先度で動作し、通知を一時停止します。「自動」ではゲームが前面に来たときにオンになり、ゲームを終了するまで続きます。
+
+# src/settings.rs
+game-mode-off = オフ
+
+# src/settings.rs
+game-mode-automatic = 自動
+
+# src/settings.rs
+game-mode-always = 常にオン
+
+# src/settings_window/notifications.rs
+notify-game-mode-changes = ゲームモードの切り替え
+
+# src/settings_window/notifications.rs
+notify-game-mode-changes-description = ゲームモードのオン・オフを通知します
+
+# src/notifications.rs
+game-mode-on-title = ゲームモード オン
+
+# src/notifications.rs
+game-mode-on-body = 制限の確認頻度を下げ、通知を一時停止しています
+
+# src/notifications.rs
+game-mode-on-game-body = { $game } を実行中です。制限の確認頻度を下げ、通知を一時停止しています
+
+# src/notifications.rs
+not-a-game = ゲームではない
+
+# src/settings_window/advanced.rs
+add-a-game = ゲームを追加
+
+# src/settings_window/advanced.rs
+add-a-game-description = Windows Game Bar が認識しているゲームと、Steam、Epic、GOG、Xbox のゲームは自動で検出されます。その他のプログラムはここで追加できます。
+
+# src/settings_window/advanced.rs
+never-a-game-path = ゲームとして扱わない · { $path }
+
+# src/notifications.rs
+game-mode-off-title = ゲームモード オフ
+
+# src/notifications.rs
+game-mode-off-body = 通常の確認と通知に戻りました
+
+# src/settings_window/command_palette.rs
+command-palette = Command Palette
+
+# src/settings_window/command_palette.rs
+stream-deck = Stream Deck
+
+# src/settings_window/command_palette.rs
+install = インストール
+
+# src/settings_window/command_palette.rs
+cmdpal-extension = Command Palette 拡張機能
+
+# src/settings_window/command_palette.rs
+cmdpal-description = PowerToys Command Palette に Minibar を追加します。プロバイダー名を入力すると上限を確認でき、バンドを Dock にピン留めできます。インストールには管理者の承認が必要です。
+
+# src/settings_window/command_palette.rs
+cmdpal-installed-hint = インストール済み。Command Palette で「minibar」またはプロバイダー名を入力するか、「Dock を編集」からバンドをピン留めしてください。
+
+# src/settings_window/command_palette.rs
+cmdpal-downloading = 拡張機能をダウンロードしています…
+
+# src/settings_window/command_palette.rs
+cmdpal-installing = インストーラーを待っています。続行するには管理者の確認を承認してください。
+
+# src/settings_window/command_palette.rs
+cmdpal-installing-short = インストール中…
+
+# src/settings_window/command_palette.rs
+cmdpal-removing = 拡張機能を削除しています…
+
+# src/settings_window/command_palette.rs
+cmdpal-failed = 拡張機能をインストールまたは削除できませんでした。
+
+# src/settings_window/command_palette.rs
+cmdpal-reinstall = 再インストール
+
+# src/settings_window/command_palette.rs
+cmdpal-dock-bands = Dock バンド
+
+# src/settings_window/command_palette.rs
+cmdpal-dock-bands-caption = 各バンドは Command Palette の Dock 設定に表示されます。「Dock を編集」からピン留めし、配置を選んでください。
+
+# src/settings_window/command_palette.rs
+cmdpal-no-bands = バンドがありません
+
+# src/settings_window/command_palette.rs
+cmdpal-no-bands-description = バンドを追加して、プロバイダーの上限を Dock にピン留めします。
+
+# src/settings_window/command_palette.rs
+cmdpal-add-band = バンドを追加
+
+# src/settings_window/command_palette.rs
+cmdpal-band = バンド { $v0 }
+
+# src/settings_window/command_palette.rs
+cmdpal-band-removed = バンドを削除しました
+
+# src/settings_window/command_palette.rs
+cmdpal-remove-band = バンドを削除
+
+# src/settings_window/command_palette.rs
+cmdpal-content-hint = Dock はバンドをタイトルとサブタイトルの 2 行で表示します。
+
+# src/settings_window/command_palette.rs
+cmdpal-indicators-hint = 最大 2 つのクォータ：1 つならタイトルとサブタイトルを使い、2 つなら 1 行ずつ表示します。

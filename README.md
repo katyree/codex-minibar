@@ -69,9 +69,9 @@ Codex Minibar reads quota data from locally authenticated provider sessions and 
 
 Click the tray icon for a native popup with the current plan, five-hour and weekly windows,
 credits, reset countdowns and usage pace of every enabled provider: Codex, Claude, Cursor,
-OpenCode Zen, OpenCode Go, OpenRouter, Antigravity, Grok, and Kiro. Providers are enabled
-independently in **Settings → Providers** and refresh independently. Antigravity, Grok and
-Kiro show subscription quota rather than unrelated API billing.
+OpenCode Zen, OpenCode Go, OpenRouter, Antigravity, Grok, Kiro, and Command Code. Providers are
+enabled independently in **Settings → Providers** and refresh independently. Antigravity, Grok,
+Kiro and Command Code show subscription quota rather than unrelated API billing.
 
 ### Several accounts and your own Home
 
@@ -111,10 +111,11 @@ Pick an accent color, a font and an independent popup border. Auto follows the W
   <img src="docs/media/1.0.0/themes.webp" alt="Popup themes">
 </p>
 
-### Eight languages
+### Nine languages
 
-English, Русский, Deutsch, Français, Español, Português (Brasil), 日本語 and 简体中文.
-Auto follows the Windows display language.
+English, Русский, Deutsch, Français, Español, Português (Brasil), 日本語, 简体中文 and 繁體中文.
+Auto follows the Windows display language, including Traditional Chinese in Taiwan,
+Hong Kong and Macao.
 
 <p align="center">
   <img src="docs/media/1.0.0/languages.webp" alt="Popup in different languages">
@@ -132,6 +133,10 @@ See spending per key and manage OpenRouter API keys from the popup's OpenRouter 
 
 - Configurable tray icons: numbers, bars, rings, reset times or reset countdowns, showing
   remaining or used percentage. Use several icons for several providers.
+- Taskbar widgets drawn inside the Windows taskbar beside the clock, in the taskbar's own style:
+  a weather-button glance, progress rings, nested rings, dials, bars or level
+  meters, with a pace mark on the graphics. Hover one for a flyout with every quota and its reset
+  time; click it to open the popup on Home or that provider's tab, at that end of the taskbar.
 - Ongoing Codex, Claude and Cursor incidents from their public status pages, with an optional
   notification when a new incident starts. Only components that affect each provider's coding
   tools count.
@@ -143,9 +148,11 @@ See spending per key and manage OpenRouter API keys from the popup's OpenRouter 
   on weekends.
 - Usage pace indicators show whether you are burning a window faster than it resets.
 - Kiro's monthly included credits and reset date, and Claude cloud-session credit balances.
+- Command Code's five-hour, weekly and monthly credit windows, plus any purchased top-up balance.
 - Warnings before a Claude login stops renewing.
 - An optional Stream Deck companion with quota keys that open the popup or a provider tab and
   launch Minibar when it is not running.
+- An optional global keyboard shortcut that shows or hides the popup from anywhere.
 - Start with Windows, update in place from GitHub Releases, and keep usage history locally.
 - Automatic Codex discovery with an override for a custom executable path.
 - Settings import and export, and a live software rendering option for systems where GPU
@@ -178,6 +185,12 @@ then its email address, and follows the **Show account name** preference. Redact
 For Antigravity, run `agy` and complete its normal sign-in once; Minibar reads that existing
 Windows Credential Manager session and never stores it in app settings. For Grok, run `grok login`;
 Minibar reads the official CLI auth cache. If either session expires, refresh it in the official CLI.
+For Command Code, run `cmdc login`; Minibar reads the API key the CLI stores in
+`~/.commandcode/auth.json` and only calls the CLI's own read-only billing endpoints. The monthly
+row is sized from the reported grant or the plan's published allowance, so an unrecognized plan
+shows only the rolling windows. Usage statistics come from the CLI's local session logs in
+`~/.commandcode/projects`, using the credit cost the CLI recorded for each response; transcripts
+written by CLI versions that did not record token usage contribute nothing.
 Browser-session access is not used.
 
 ### Add another Codex account

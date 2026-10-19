@@ -145,6 +145,8 @@ fn commit_update<T>(
     let mut settings = Settings::load_or_create(&path)?;
     let value = update(&mut settings)?;
     settings.normalize_tray_widgets();
+    settings.taskbar.normalize();
+    settings.command_palette.normalize();
     settings.normalize_popup_visibility();
     // Persist first so a flaky side effect cannot block live UI updates.
     settings.save(&path)?;
@@ -164,6 +166,8 @@ fn commit_update<T>(
 fn commit_replace(settings_tx: Sender<Settings>, mut settings: Settings) -> anyhow::Result<()> {
     let path = Settings::default_path()?;
     settings.normalize_tray_widgets();
+    settings.taskbar.normalize();
+    settings.command_palette.normalize();
     settings.normalize_popup_visibility();
     settings.save(&path)?;
     if let Err(error) = settings.apply_runtime_effects() {

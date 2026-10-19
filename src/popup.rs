@@ -144,6 +144,16 @@ pub fn apply_popup_appearance(
 
 /// Show the popup near a tray click (physical screen pixels).
 pub fn show_near(anchor_x: i32, anchor_y: i32) {
+    show(anchor_x, anchor_y, false);
+}
+
+/// Show the popup at the end of the taskbar nearest a taskbar widget, so a
+/// widget at the start of the taskbar opens it on that side.
+pub fn show_beside(anchor_x: i32, anchor_y: i32) {
+    show(anchor_x, anchor_y, true);
+}
+
+fn show(anchor_x: i32, anchor_y: i32, beside: bool) {
     // Optimistic: the tray bridge reads this flag before the GPUI thread has
     // processed the command, and a second tray click must toggle it closed.
     POPUP_VISIBLE.store(true, Ordering::SeqCst);
@@ -151,6 +161,7 @@ pub fn show_near(anchor_x: i32, anchor_y: i32) {
     arm_outside_click_grace();
     crate::popup_window::send_command(crate::popup_window::PopupCommand::Show {
         anchor: Some((anchor_x, anchor_y)),
+        beside,
     });
 }
 
@@ -224,6 +235,7 @@ pub fn pump_messages() {
     unsafe {
         let mut message = std::mem::zeroed::<MSG>();
         while PeekMessageW(&mut message, std::ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
+            crate::hotkey::observe_message(&message);
             TranslateMessage(&message);
             DispatchMessageW(&message);
         }

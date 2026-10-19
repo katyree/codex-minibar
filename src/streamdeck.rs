@@ -89,8 +89,12 @@ const IO_TIMEOUT: Duration = Duration::from_secs(3);
 /// Commands that must be executed by the existing tray/UI bridge thread.
 #[derive(Clone, Debug)]
 pub enum Command {
-    OpenPopup { provider: Option<ProviderId> },
+    OpenPopup {
+        provider: Option<ProviderId>,
+    },
     RefreshData,
+    /// Settings on the Command Palette page.
+    OpenCommandPaletteSettings,
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,6 +112,13 @@ enum Request {
     OpenPopup {
         token: String,
         provider: Option<String>,
+    },
+    /// Dock bands and provider summaries for the Command Palette extension.
+    Palette {
+        token: String,
+    },
+    OpenSettings {
+        token: String,
     },
 }
 
@@ -134,6 +145,13 @@ enum Response {
         observed_at: DateTime<Utc>,
         executable: String,
         providers: Vec<ProviderSnapshot>,
+    },
+    Palette {
+        ok: bool,
+        protocol: u32,
+        observed_at: DateTime<Utc>,
+        #[serde(flatten)]
+        payload: crate::cmdpal::Payload,
     },
     Accepted {
         ok: bool,
@@ -320,7 +338,9 @@ fn handle_request(
         Request::Catalog { token }
         | Request::Snapshot { token }
         | Request::Refresh { token }
-        | Request::OpenPopup { token, .. } => token,
+        | Request::OpenPopup { token, .. }
+        | Request::Palette { token }
+        | Request::OpenSettings { token } => token,
     };
     if token != expected_token {
         return Response::Error {
@@ -336,6 +356,26 @@ fn handle_request(
             providers: build_catalog(state),
         },
         Request::Snapshot { .. } => build_snapshot(state),
+        Request::Palette { .. } => {
+            let limits = state
+                .limits
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            Response::Palette {
+                ok: true,
+                protocol: PROTOCOL_VERSION,
+                observed_at: Utc::now(),
+                payload: crate::cmdpal::payload(&limits),
+            }
+        }
+        Request::OpenSettings { .. } => match commands_tx.send(Command::OpenCommandPaletteSettings)
+        {
+            Ok(()) => Response::Accepted { ok: true },
+            Err(error) => Response::Error {
+                ok: false,
+                error: format!("queue settings action: {error}"),
+            },
+        },
         Request::Refresh { .. } => match commands_tx.send(Command::RefreshData) {
             Ok(()) => Response::Accepted { ok: true },
             Err(error) => Response::Error {

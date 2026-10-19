@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "CodexMinibar.CommandPalette (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "CodexMinibar.CommandPalette (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

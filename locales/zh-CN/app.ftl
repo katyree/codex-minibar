@@ -818,6 +818,12 @@ found-an-official-grok-cli-sign-in-on-this-pc = 已在此电脑找到官方 Grok
 
 not-found-run-grok-login-before-enabling-it = 未找到。请先运行 grok login 再启用。
 
+# src/settings_window/onboarding.rs
+found-an-official-command-code-cli-sign-in-on-this-pc = 已在此电脑找到官方 Command Code CLI 登录信息。
+
+# src/settings_window/onboarding.rs
+not-found-run-cmdc-login-before-enabling-it = 未找到。请先运行 cmdc login 再启用。
+
 found-kiro-ide-kiro-crew-or-a-signed-in-kiro-cli = 已找到 Kiro IDE、Kiro Crew 或已登录的 Kiro CLI。
 
 not-found-install-kiro-ide-or-kiro-crew-or-sign-in-to-kiro-cli = 未找到。请安装 Kiro IDE 或 Kiro Crew，或登录 Kiro CLI。
@@ -1236,6 +1242,9 @@ cursor-app-folder = Cursor 应用文件夹
 
 grok-cli-folder = Grok CLI 文件夹
 
+# src/settings_window/providers.rs
+command-code-cli-folder = Command Code CLI 文件夹
+
 kiro-ide-folder = Kiro IDE 文件夹
 
 kiro-crew-app-path = Kiro Crew 应用路径
@@ -1258,6 +1267,9 @@ reads-subscription-quota-from-your-existing-official-agy-windows = 通过现有�
 
 reads-supergrok-subscription-credits-from-your-existing-official = 通过现有的官方 Grok CLI 登录读取 SuperGrok 订阅积分。
 
+# src/settings_window/providers.rs
+reads-command-code-5h-weekly-and-monthly-credits-from-your-existin = 通过现有的官方 CLI 登录读取 Command Code 的 5 小时、每周和每月积分。
+
 fetches-kiro-s-live-monthly-credits-with-its-shared-sign-in-recog = 通过 Kiro 共享登录获取实时每月积分；可识别 IDE、Crew 和 CLI 安装。
 
 codex-desktop-app = Codex 桌面应用
@@ -1273,6 +1285,9 @@ cursor-app = Cursor 应用
 antigravity-app = Antigravity 应用
 
 grok-cli = Grok CLI
+
+# src/settings_window/providers.rs
+command-code-cli = Command Code CLI
 
 kiro-ide = Kiro IDE
 
@@ -1481,6 +1496,9 @@ folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut = 包含 agy.e
 
 folder-with-grok-exe-grok-cmd-or-grok-ps1-leave-empty-to-find-it = 包含 grok.exe、grok.cmd 或 grok.ps1 的文件夹。留空以自动查找。
 
+# src/settings_window/providers.rs
+folder-with-cmdc-cmd-or-cmdc-ps1-leave-empty-to-find-it-automati = 包含 cmdc.cmd 或 cmdc.ps1 的文件夹。留空以自动查找。
+
 folder-containing-kiro-exe-or-the-executable-itself-leave-empty-t = 包含 Kiro.exe 的文件夹或可执行文件本身。留空以自动查找。
 
 folder-containing-kirocrew-exe-or-the-executable-itself-leave-emp = 包含 KiroCrew.exe 的文件夹或可执行文件本身。留空以自动检测当前用户和所有用户的安装。
@@ -1624,7 +1642,7 @@ openrouter-keys-reset-monthly = 每月
 openrouter-keys-byok = 将 BYOK 用量计入限额
 openrouter-keys-enabled = 已启用
 openrouter-keys-delete = 删除
-openrouter-keys-delete-tracked = 本应用正在使用此密钥。请先在设置中将其移除。
+openrouter-keys-delete-tracked = Minibar 也将停止跟踪它。
 openrouter-keys-saving = 正在保存…
 openrouter-keys-delete-title = 删除“{ $name }”？
 openrouter-keys-delete-message = 所有仍在使用此密钥的地方将立即停止工作。此操作无法撤销；停用密钥则可以恢复。
@@ -1661,6 +1679,12 @@ openrouter-keys-no-management-key = 此账户没有管理密钥。
 openrouter-keys-management-key-rejected = OpenRouter 拒绝了管理密钥。请在设置中替换它。
 openrouter-keys-not-a-management-key = 此密钥无法管理其他密钥。请使用管理密钥。
 openrouter-keys-key-not-found = 此密钥已不存在。
+openrouter-keys-untrack = 从应用中移除
+openrouter-keys-untracking = 正在移除…
+openrouter-keys-untrack-title = 停止跟踪“{ $name }”？
+openrouter-keys-untrack-message = Minibar 将忘记此密钥。它在 OpenRouter 上仍可继续使用。
+openrouter-keys-tracked-here = Minibar 正在跟踪此密钥。
+openrouter-keys-manage-hint = 在设置中添加管理密钥，即可创建、编辑和删除密钥。
 
 # src/settings_window/notifications.rs
 notification-sounds = 通知声音
@@ -1777,3 +1801,208 @@ muse-session-missing = Connect your signed-in Muse account from Chrome to read w
 muse-remove-session = Remove Muse session
 muse-remove-session-help = Minibar will forget the saved session credential. Your Chrome sign-in stays unchanged.
 muse-session-removed = Muse session removed
+# src/whats_new.rs
+no-summary-for-this-version = 此版本暂无摘要。完整发行说明见 GitHub。
+
+# src/whats_new.rs
+couldn-t-load-what-s-new = 无法加载新功能。请检查网络连接，或在 GitHub 上查看发行说明。
+
+# src/whats_new.rs
+full-release-notes = 完整发行说明
+
+# src/settings_window/about.rs
+show-what-s-new-after-updating = 更新后显示新功能
+
+# src/settings_window/about.rs
+a-short-summary-of-the-release-once-it-s-installed = 安装后显示该版本的简短摘要。
+
+# src/settings_window/about.rs
+view = 查看
+
+# src/settings_window/general.rs
+popup-shortcut = 弹出窗口快捷键
+popup-shortcut-description = 在 Windows 任意位置按下即可显示或隐藏弹出窗口。
+shortcut-not-set = 未设置
+press-a-shortcut = 请按下快捷键…
+popup-shortcut-recording-hint = Esc 取消，Backspace 删除快捷键。
+popup-shortcut-needs-modifier = 请包含 Ctrl、Alt 或 Win，或使用 F13–F24。
+popup-shortcut-in-use = 此快捷键已被其他应用占用，请选择其他组合。
+clear-shortcut = 删除快捷键
+taskbar = 任务栏
+preview = 预览
+taskbar-page-caption = 直接绘制在 Windows 任务栏中、时钟旁边的实时用量组件。它们跟随任务栏主题；单击组件即可打开其提供商的弹出窗口。
+taskbar-show-widgets = 在任务栏上显示组件
+taskbar-show-widgets-description = 在 Windows 任务栏中绘制下面的组件。
+taskbar-position = 位置
+taskbar-position-description = 组件在任务栏上的位置。开头最适合居中的任务栏图标。
+taskbar-position-tray = 通知区域旁边
+taskbar-position-start = 任务栏开头
+taskbar-widgets = 组件
+taskbar-no-widgets = 暂无组件
+taskbar-no-widgets-description = 添加组件以在任务栏上显示额度。
+taskbar-show-provider-icon = 显示提供商图标
+taskbar-style-glance = 速览
+taskbar-style-glance-hint = 提供商图标旁边显示两行文字，就像天气按钮。
+taskbar-style-rings-hint = 每个额度一个进度环，旁边显示数值。
+taskbar-style-bars-hint = 在提供商图标旁边堆叠细进度条。
+taskbar-menu-open = 打开 Codex Minibar
+taskbar-menu-settings = 任务栏组件设置
+taskbar-menu-hide = 隐藏任务栏组件
+taskbar-card-left = 剩余 { $value }
+taskbar-card-used = 已用 { $value }
+taskbar-card-resets = { $time } 后重置 · { $clock }
+taskbar-card-no-data = 正在等待数据
+short-5h = 5小时
+short-7d = 7天
+taskbar-style-nested = 嵌套圆环
+taskbar-style-dials = 表盘
+taskbar-style-meters = 电量条
+taskbar-style-nested-hint = 在一个圆环的空间里放下同心圆环，可在旁边显示数值。
+taskbar-style-dials-hint = 每个配额一个小圆环，数字显示在环内。
+taskbar-style-meters-hint = 纤细的电量柱，像电池指示器。
+taskbar-show-provider-icon-description = 在小组件开头显示提供商标志。
+taskbar-show-labels = 显示标签
+taskbar-show-labels-description = 在数值旁显示 5小时、7天 等简称。
+taskbar-show-values = 显示百分比
+taskbar-show-values-description = 小组件上的配额百分比。
+taskbar-show-pace = 显示进度节奏
+taskbar-show-pace-description = 标出按匀速消耗时此刻应达到的用量位置。
+taskbar-menu-edit = 编辑此小组件
+taskbar-content = 内容
+taskbar-content-hint = 小组件在图形旁显示的内容。
+taskbar-reset-time = 重置时间
+taskbar-reset-time-description = 每个配额何时重置。
+taskbar-reset-off = 不显示
+taskbar-reset-countdown = 剩余时间
+taskbar-reset-clock = 时钟时间
+taskbar-cycle = 用鼠标滚轮切换小组件
+taskbar-cycle-description = 一次只显示一个小组件；在其上滚动滚轮可切换到下一个。
+taskbar-card-tokens = { $count } 个 token
+taskbar-click = 单击打开
+taskbar-click-description = 单击小组件时打开的弹出窗口页面。
+taskbar-click-nearest = 主页；不在主页时打开其标签页
+taskbar-click-tab = 提供商标签页
+taskbar-click-home = 主页
+
+# src/settings_window/notifications.rs
+follow-do-not-disturb = 勿扰模式时暂停
+
+# src/settings_window/notifications.rs
+follow-do-not-disturb-description = Windows 勿扰或专注模式开启期间，跳过通知并关闭提示音。你主动发起的操作结果仍会显示。
+
+# src/settings_window/advanced.rs
+performance = 性能
+
+# src/settings_window/advanced.rs
+game-mode = 游戏模式
+
+# src/settings_window/advanced.rs
+game-mode-description = 降低额度和用量的检查频率，以低优先级运行并暂停通知。“自动”会在游戏切到前台时开启，直到游戏关闭。
+
+# src/settings.rs
+game-mode-off = 关闭
+
+# src/settings.rs
+game-mode-automatic = 自动
+
+# src/settings.rs
+game-mode-always = 始终开启
+
+# src/settings_window/notifications.rs
+notify-game-mode-changes = 游戏模式切换
+
+# src/settings_window/notifications.rs
+notify-game-mode-changes-description = 游戏模式开启或关闭时通知
+
+# src/notifications.rs
+game-mode-on-title = 游戏模式已开启
+
+# src/notifications.rs
+game-mode-on-body = 降低额度检查频率并暂停通知
+
+# src/notifications.rs
+game-mode-on-game-body = { $game } 正在运行。降低额度检查频率并暂停通知
+
+# src/notifications.rs
+not-a-game = 不是游戏
+
+# src/settings_window/advanced.rs
+add-a-game = 添加游戏
+
+# src/settings_window/advanced.rs
+add-a-game-description = Windows Game Bar 已识别的游戏以及 Steam、Epic、GOG 和 Xbox 中的游戏会被自动检测。可在此添加其他任何程序。
+
+# src/settings_window/advanced.rs
+never-a-game-path = 从不视为游戏 · { $path }
+
+# src/notifications.rs
+game-mode-off-title = 游戏模式已关闭
+
+# src/notifications.rs
+game-mode-off-body = 已恢复正常检查和通知
+
+# src/settings_window/command_palette.rs
+command-palette = Command Palette
+
+# src/settings_window/command_palette.rs
+stream-deck = Stream Deck
+
+# src/settings_window/command_palette.rs
+install = 安装
+
+# src/settings_window/command_palette.rs
+cmdpal-extension = Command Palette 扩展
+
+# src/settings_window/command_palette.rs
+cmdpal-description = 将 Minibar 添加到 PowerToys Command Palette：输入提供商名称即可查看额度，或将条带固定到 Dock。安装需要管理员批准。
+
+# src/settings_window/command_palette.rs
+cmdpal-installed-hint = 已安装。在 Command Palette 中输入“minibar”或提供商名称，或通过“编辑 Dock”固定条带。
+
+# src/settings_window/command_palette.rs
+cmdpal-downloading = 正在下载扩展…
+
+# src/settings_window/command_palette.rs
+cmdpal-installing = 正在等待安装程序。请批准管理员提示以继续。
+
+# src/settings_window/command_palette.rs
+cmdpal-installing-short = 正在安装…
+
+# src/settings_window/command_palette.rs
+cmdpal-removing = 正在移除扩展…
+
+# src/settings_window/command_palette.rs
+cmdpal-failed = 无法安装或移除扩展。
+
+# src/settings_window/command_palette.rs
+cmdpal-reinstall = 重新安装
+
+# src/settings_window/command_palette.rs
+cmdpal-dock-bands = Dock 条带
+
+# src/settings_window/command_palette.rs
+cmdpal-dock-bands-caption = 每个条带都会出现在 Command Palette 的 Dock 设置中。通过“编辑 Dock”固定它，然后选择位置。
+
+# src/settings_window/command_palette.rs
+cmdpal-no-bands = 没有条带
+
+# src/settings_window/command_palette.rs
+cmdpal-no-bands-description = 添加条带，将提供商额度固定到 Dock。
+
+# src/settings_window/command_palette.rs
+cmdpal-add-band = 添加条带
+
+# src/settings_window/command_palette.rs
+cmdpal-band = 条带 { $v0 }
+
+# src/settings_window/command_palette.rs
+cmdpal-band-removed = 条带已移除
+
+# src/settings_window/command_palette.rs
+cmdpal-remove-band = 移除条带
+
+# src/settings_window/command_palette.rs
+cmdpal-content-hint = Dock 将条带显示为标题和下方的副标题。
+
+# src/settings_window/command_palette.rs
+cmdpal-indicators-hint = 最多 2 个额度：一个占用标题和副标题，两个各占一行。

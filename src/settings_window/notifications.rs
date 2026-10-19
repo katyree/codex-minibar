@@ -48,6 +48,16 @@ impl SettingsWindow {
                         this.edit(cx, move |s| s.notifications.limits_changed = value)
                     }),
                 ),
+                kit::toggle_row(
+                    k,
+                    "notif-game-mode-changes",
+                    crate::i18n::tr("notify-game-mode-changes"),
+                    Some(crate::i18n::tr("notify-game-mode-changes-description").into()),
+                    n.game_mode_changes,
+                    Self::h(cx, |this, value: bool, _, cx| {
+                        this.edit(cx, move |s| s.notifications.game_mode_changes = value)
+                    }),
+                ),
             ]
         });
         let news = kit::card_of(k, |k| {
@@ -93,17 +103,29 @@ impl SettingsWindow {
                 ),
             ]
         });
-        let sound = kit::card_of(k, |k| {
-            vec![kit::toggle_row(
-                k,
-                "notif-sound",
-                crate::i18n::tr("notification-sounds"),
-                Some(crate::i18n::tr("plays-a-short-sound-with-each-notification").into()),
-                n.sound,
-                Self::h(cx, |this, value: bool, _, cx| {
-                    this.edit(cx, move |s| s.notifications.sound = value)
-                }),
-            )]
+        let delivery = kit::card_of(k, |k| {
+            vec![
+                kit::toggle_row(
+                    k,
+                    "notif-sound",
+                    crate::i18n::tr("notification-sounds"),
+                    Some(crate::i18n::tr("plays-a-short-sound-with-each-notification").into()),
+                    n.sound,
+                    Self::h(cx, |this, value: bool, _, cx| {
+                        this.edit(cx, move |s| s.notifications.sound = value)
+                    }),
+                ),
+                kit::toggle_row(
+                    k,
+                    "notif-follow-do-not-disturb",
+                    crate::i18n::tr("follow-do-not-disturb"),
+                    Some(crate::i18n::tr("follow-do-not-disturb-description").into()),
+                    n.follow_do_not_disturb,
+                    Self::h(cx, |this, value: bool, _, cx| {
+                        this.edit(cx, move |s| s.notifications.follow_do_not_disturb = value)
+                    }),
+                ),
+            ]
         });
         let low = self.threshold_card(
             k,
@@ -131,9 +153,11 @@ impl SettingsWindow {
             |s, v| s.notifications.weekly_low_usage_enabled = v,
             |s, v| s.notifications.weekly_low_usage_threshold_percent = v,
         );
+        // How notifications behave comes first, then what they are about.
         vec![
+            delivery,
+            kit::section_heading(k, crate::i18n::tr("activity")),
             activity,
-            sound,
             kit::section_heading(k, crate::i18n::tr("low-usage")),
             low,
             weekly,

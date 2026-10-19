@@ -10,9 +10,12 @@ use chrono::{DateTime, Local, Timelike};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-pub const SETTINGS_VERSION: u32 = 40;
+pub const SETTINGS_VERSION: u32 = 41;
+/// First version where the taskbar widget is shown by default.
+const TASKBAR_DEFAULT_VERSION: u32 = 41;
 
 mod migration;
+pub(crate) mod unknown;
 
 pub use crate::instances::{BadgeColor, InstanceSource, ProviderId, ProviderInstance};
 
@@ -723,6 +726,45 @@ pub enum ProviderKind {
     Kiro,
     Junie,
     Muse,
+    CommandCode,
+}
+
+/// When the app backs off to leave CPU, GPU and network to a game.
+///
+/// While active, provider polls and usage scans run less often, the process
+/// runs at a lower priority with EcoQoS, and notifications are held back.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GameMode {
+    Off,
+    /// While a game runs: from the moment it is in the foreground until it
+    /// exits.
+    #[default]
+    Automatic,
+    Always,
+}
+
+impl GameMode {
+    pub const ALL: [Self; 3] = [Self::Off, Self::Automatic, Self::Always];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Off => crate::i18n::tr("game-mode-off"),
+            Self::Automatic => crate::i18n::tr("game-mode-automatic"),
+            Self::Always => crate::i18n::tr("game-mode-always"),
+        }
+    }
+
+    pub fn index(self) -> i32 {
+        Self::ALL.iter().position(|mode| *mode == self).unwrap_or(0) as i32
+    }
+
+    pub fn from_index(index: i32) -> Self {
+        usize::try_from(index)
+            .ok()
+            .and_then(|index| Self::ALL.get(index).copied())
+            .unwrap_or_default()
+    }
 }
 
 /// How provider instances map onto popup tabs.
@@ -860,7 +902,7 @@ fn new_id(prefix: &str) -> String {
 }
 
 impl ProviderKind {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Codex,
         Self::Claude,
         Self::Cursor,
@@ -872,6 +914,7 @@ impl ProviderKind {
         Self::Kiro,
         Self::Junie,
         Self::Muse,
+        Self::CommandCode,
     ];
 
     pub const fn id(self) -> &'static str {
@@ -887,6 +930,7 @@ impl ProviderKind {
             Self::Kiro => "kiro",
             Self::Junie => "junie",
             Self::Muse => "muse-ai",
+            Self::CommandCode => "command-code",
         }
     }
 
@@ -903,6 +947,7 @@ impl ProviderKind {
             "kiro" => Some(Self::Kiro),
             "junie" => Some(Self::Junie),
             "muse-ai" => Some(Self::Muse),
+            "command-code" => Some(Self::CommandCode),
             _ => None,
         }
     }
@@ -920,6 +965,7 @@ impl ProviderKind {
             Self::Kiro => "Kiro",
             Self::Junie => "Junie",
             Self::Muse => "Muse",
+            Self::CommandCode => "Command Code",
         }
     }
 
@@ -1698,6 +1744,301 @@ impl TrayWidget {
     }
 }
 
+/// Visual design of one taskbar widget.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskbarWidgetStyle {
+    /// Provider mark beside two lines of text, like the Windows weather
+    /// button. Also reads the retired text-only `compact` design, which is
+    /// a Glance without the mark.
+    #[default]
+    #[serde(alias = "compact")]
+    Glance,
+    /// A progress ring per indicator with its value beside it.
+    Rings,
+    /// Thin progress bars stacked beside the provider mark.
+    Bars,
+    /// Concentric rings, one per indicator, with optional values beside.
+    Nested,
+    /// A ring per indicator with its value inside.
+    Dials,
+    /// Vertical level columns, like a battery gauge.
+    Meters,
+}
+
+impl TaskbarWidgetStyle {
+    /// Picker order: text designs first, then by graphic.
+    pub const ALL: [Self; 6] = [
+        Self::Glance,
+        Self::Rings,
+        Self::Nested,
+        Self::Dials,
+        Self::Bars,
+        Self::Meters,
+    ];
+
+    /// How many indicators fit the taskbar height in this design.
+    pub const fn max_indicators(self) -> usize {
+        match self {
+            Self::Glance => 2,
+            Self::Rings | Self::Bars | Self::Nested | Self::Dials | Self::Meters => 3,
+        }
+    }
+
+    pub fn index(self) -> usize {
+        Self::ALL
+            .iter()
+            .position(|style| *style == self)
+            .unwrap_or_default()
+    }
+
+    /// Draws progress graphics, which can carry a pace marker.
+    pub const fn has_graphic(self) -> bool {
+        !matches!(self, Self::Glance)
+    }
+
+    /// Writes indicator names next to values.
+    pub const fn has_labels(self) -> bool {
+        !matches!(self, Self::Dials)
+    }
+
+    /// Writes reset times; dials have no room for them.
+    pub const fn has_reset(self) -> bool {
+        self.has_labels()
+    }
+
+    pub fn from_index(index: usize) -> Self {
+        Self::ALL.get(index).copied().unwrap_or_default()
+    }
+}
+
+/// How a taskbar widget tells when its quotas reset.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskbarResetDisplay {
+    /// Not shown on the widget; the hover card still has it.
+    Off,
+    /// Time left: `2h 13m`.
+    #[default]
+    Countdown,
+    /// Wall-clock time: `18:40`, with the weekday once it is not today.
+    Clock,
+}
+
+impl TaskbarResetDisplay {
+    pub const ALL: [Self; 3] = [Self::Off, Self::Countdown, Self::Clock];
+
+    pub fn index(self) -> usize {
+        Self::ALL
+            .iter()
+            .position(|display| *display == self)
+            .unwrap_or_default()
+    }
+}
+
+/// The popup page a taskbar widget click opens.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskbarClick {
+    /// Home when it shows the widget's instance, otherwise its tab.
+    #[default]
+    Nearest,
+    /// The instance's tab.
+    Tab,
+    /// Home.
+    Home,
+}
+
+impl TaskbarClick {
+    pub const ALL: [Self; 3] = [Self::Nearest, Self::Tab, Self::Home];
+
+    pub fn index(self) -> usize {
+        Self::ALL
+            .iter()
+            .position(|click| *click == self)
+            .unwrap_or_default()
+    }
+}
+
+/// Where the widget strip sits on the taskbar.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskbarAlignment {
+    /// Immediately left of the notification area.
+    #[default]
+    Tray,
+    /// At the taskbar's leading edge, where the Windows widgets button lives.
+    Start,
+}
+
+fn new_taskbar_widget_id() -> String {
+    new_tray_widget_id().replacen("tray-", "taskbar-", 1)
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskbarWidget {
+    #[serde(default = "new_taskbar_widget_id")]
+    pub id: String,
+    #[serde(default)]
+    pub style: TaskbarWidgetStyle,
+    #[serde(default)]
+    pub indicators: Vec<TrayIndicator>,
+    /// Draws the provider mark of the first indicator.
+    #[serde(default = "default_true")]
+    pub show_icon: bool,
+    /// Writes short indicator names (`5h`, `7d`) beside values.
+    #[serde(default = "default_true")]
+    pub show_labels: bool,
+    /// Writes the quota percentages.
+    #[serde(default = "default_true")]
+    pub show_values: bool,
+    /// Writes when each quota resets.
+    #[serde(default)]
+    pub reset: TaskbarResetDisplay,
+    /// Marks where an even burn would be on rings, bars and meters.
+    #[serde(default = "default_true")]
+    pub show_pace: bool,
+}
+
+impl TaskbarWidget {
+    /// The provider preset: its first default tray metrics as a Glance.
+    pub fn for_provider(provider: ProviderId) -> Self {
+        let descriptor = crate::provider_registry::descriptor(provider.kind());
+        let style = TaskbarWidgetStyle::Glance;
+        Self {
+            id: new_taskbar_widget_id(),
+            style,
+            indicators: descriptor
+                .default_tray_metrics
+                .iter()
+                .take(style.max_indicators())
+                .map(|metric| TrayIndicator::new(provider, *metric))
+                .collect(),
+            show_icon: true,
+            show_labels: true,
+            show_values: true,
+            reset: TaskbarResetDisplay::Countdown,
+            show_pace: true,
+        }
+    }
+
+    pub fn duplicate_with_new_id(&self) -> Self {
+        let mut copy = self.clone();
+        copy.id = new_taskbar_widget_id();
+        copy
+    }
+
+    /// The instance a click opens: the first indicator's.
+    pub fn provider(&self) -> Option<ProviderId> {
+        self.indicators.iter().find_map(TrayIndicator::provider)
+    }
+
+    pub fn is_visible_for(&self, instances: &[ProviderInstance]) -> bool {
+        self.indicators.iter().any(|indicator| {
+            instances
+                .iter()
+                .any(|instance| instance.enabled && instance.id == indicator.provider_id)
+        })
+    }
+
+    pub fn normalize(&mut self) -> bool {
+        let mut changed = false;
+        if self.id.is_empty() {
+            self.id = new_taskbar_widget_id();
+            changed = true;
+        }
+        let max = self.style.max_indicators();
+        if self.indicators.len() > max {
+            self.indicators.truncate(max);
+            changed = true;
+        }
+        changed
+    }
+}
+
+/// Bands the PowerToys Command Palette extension offers to its Dock.
+///
+/// Widgets reuse the taskbar widget model, but the Dock draws them itself as
+/// an icon with a title and subtitle, so every widget is a text Glance.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CommandPaletteSettings {
+    pub widgets: Vec<TaskbarWidget>,
+}
+
+impl CommandPaletteSettings {
+    pub fn normalize(&mut self) -> bool {
+        let mut changed = false;
+        let mut ids = std::collections::HashSet::new();
+        for widget in &mut self.widgets {
+            if widget.style != TaskbarWidgetStyle::Glance {
+                widget.style = TaskbarWidgetStyle::Glance;
+                changed = true;
+            }
+            changed |= widget.normalize();
+            if !ids.insert(widget.id.clone()) {
+                widget.id = new_dock_widget_id();
+                ids.insert(widget.id.clone());
+                changed = true;
+            }
+        }
+        changed
+    }
+}
+
+fn new_dock_widget_id() -> String {
+    new_tray_widget_id().replacen("tray-", "dock-", 1)
+}
+
+impl TaskbarWidget {
+    /// The provider preset for a Dock band.
+    pub fn dock_for_provider(provider: ProviderId) -> Self {
+        Self {
+            id: new_dock_widget_id(),
+            ..Self::for_provider(provider)
+        }
+    }
+
+    pub fn dock_duplicate_with_new_id(&self) -> Self {
+        let mut copy = self.clone();
+        copy.id = new_dock_widget_id();
+        copy
+    }
+}
+
+/// Live widgets drawn inside the Windows taskbar.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TaskbarSettings {
+    pub enabled: bool,
+    pub alignment: TaskbarAlignment,
+    /// Shows one widget at a time; the scroll wheel over it switches.
+    pub cycle: bool,
+    /// The popup page a click opens.
+    pub click: TaskbarClick,
+    pub widgets: Vec<TaskbarWidget>,
+}
+
+impl TaskbarSettings {
+    pub fn normalize(&mut self) -> bool {
+        let mut changed = false;
+        let mut ids = std::collections::HashSet::new();
+        for widget in &mut self.widgets {
+            changed |= widget.normalize();
+            if !ids.insert(widget.id.clone()) {
+                widget.id = new_taskbar_widget_id();
+                ids.insert(widget.id.clone());
+                changed = true;
+            }
+        }
+        changed
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct NotificationSettings {
@@ -1730,6 +2071,11 @@ pub struct NotificationSettings {
     pub provider_status_notifications: bool,
     /// Play the kind's sound with each notification.
     pub sound: bool,
+    /// Hold back unsolicited notifications while Windows Do Not Disturb
+    /// (Focus Assist on Windows 10) is on.
+    pub follow_do_not_disturb: bool,
+    /// Notify when game mode turns on or off.
+    pub game_mode_changes: bool,
 }
 
 impl Default for NotificationSettings {
@@ -1750,6 +2096,8 @@ impl Default for NotificationSettings {
             provider_status_enabled: true,
             provider_status_notifications: true,
             sound: true,
+            follow_do_not_disturb: true,
+            game_mode_changes: false,
         }
     }
 }
@@ -1841,12 +2189,30 @@ pub struct Settings {
     pub show_account_name: bool,
     /// Shows the Edit Home button in the popup's bottom bar.
     pub show_edit_home_button: bool,
+    /// System-wide shortcut that shows or hides the popup. None leaves every
+    /// key combination to other applications.
+    pub popup_hotkey: Option<crate::hotkey::Hotkey>,
     pub tray_widgets: Vec<TrayWidget>,
+    /// Widgets drawn inside the Windows taskbar.
+    pub taskbar: TaskbarSettings,
+    /// Dock bands of the PowerToys Command Palette extension.
+    pub command_palette: CommandPaletteSettings,
     pub notifications: NotificationSettings,
     pub history_retention_days: u16,
     pub check_for_updates: bool,
     /// Draws every window on the CPU (WARP) instead of the GPU.
     pub software_rendering: bool,
+    /// When background work backs off to leave resources to games.
+    pub game_mode: GameMode,
+    /// Executables Automatic game mode treats as games even when Windows
+    /// does not know them.
+    pub game_mode_games: Vec<String>,
+    /// Executables Automatic game mode never treats as games.
+    pub game_mode_ignored: Vec<String>,
+    /// Entries a newer build wrote that this build cannot decode. They are
+    /// skipped while running and written back on save.
+    #[serde(skip)]
+    pub(crate) unknown_entries: unknown::UnknownEntries,
 }
 
 fn default_show_usage_values() -> bool {
@@ -1855,7 +2221,7 @@ fn default_show_usage_values() -> bool {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self {
+        let mut settings = Self {
             version: SETTINGS_VERSION,
             onboarding_completed: false,
             theme: AppTheme::Auto,
@@ -1901,17 +2267,47 @@ impl Default for Settings {
             total_spend_period: TotalSpendPeriod::default(),
             show_account_name: false,
             show_edit_home_button: true,
+            popup_hotkey: None,
             // An empty list intentionally means "show the ordinary app icon".
             tray_widgets: Vec::new(),
+            taskbar: TaskbarSettings::default(),
+            command_palette: CommandPaletteSettings::default(),
             notifications: NotificationSettings::default(),
             history_retention_days: 30,
             check_for_updates: true,
             software_rendering: false,
-        }
+            game_mode: GameMode::default(),
+            game_mode_games: Vec::new(),
+            game_mode_ignored: Vec::new(),
+            unknown_entries: unknown::UnknownEntries::default(),
+        };
+        settings.enable_taskbar_by_default();
+        settings
     }
 }
 
 impl Settings {
+    /// Shows the taskbar widgets, seeding one for the first enabled provider
+    /// when there is none, so the feature is discoverable out of the box.
+    fn enable_taskbar_by_default(&mut self) -> bool {
+        let mut changed = !self.taskbar.enabled;
+        self.taskbar.enabled = true;
+        if self.taskbar.widgets.is_empty()
+            && let Some(instance) = self.instances.iter().find(|instance| {
+                instance.enabled
+                    && !crate::provider_registry::descriptor(instance.driver)
+                        .default_tray_metrics
+                        .is_empty()
+            })
+        {
+            self.taskbar
+                .widgets
+                .push(TaskbarWidget::for_provider(instance.provider_id()));
+            changed = true;
+        }
+        changed
+    }
+
     pub fn default_path() -> Result<PathBuf> {
         let dirs = ProjectDirs::from("dev", "Codex Minibar", "Codex Minibar")
             .context("could not resolve the application config directory")?;
@@ -1953,11 +2349,17 @@ impl Settings {
         };
         let moved_credentials = original_version < migration::INSTANCES_VERSION
             && migration::finish_instance_migration(&mut settings);
+        // Existing installs get the taskbar widget once, so they learn of it.
+        let taskbar_introduced =
+            original_version < TASKBAR_DEFAULT_VERSION && settings.enable_taskbar_by_default();
         let repaired = settings.repair_inplace();
-        let tray_widgets_normalized = settings.normalize_tray_widgets();
+        let tray_widgets_normalized = settings.normalize_tray_widgets()
+            | settings.taskbar.normalize()
+            | settings.command_palette.normalize();
         let popup_visibility_normalized = settings.normalize_popup_visibility();
         if dirty
             || moved_credentials
+            || taskbar_introduced
             || repaired
             || tray_widgets_normalized
             || popup_visibility_normalized
@@ -1984,6 +2386,8 @@ impl Settings {
             .with_context(|| format!("{} is not a valid settings file", path.display()))?;
         settings.repair_inplace();
         settings.normalize_tray_widgets();
+        settings.taskbar.normalize();
+        settings.command_palette.normalize();
         settings.normalize_popup_visibility();
         Ok(settings)
     }
@@ -2006,6 +2410,20 @@ impl Settings {
         match document.clone().try_into::<Self>() {
             Ok(settings) => Ok((settings, dirty)),
             Err(error) => {
+                // A newer build may have written values this one cannot read,
+                // such as an instance of an unknown provider. Skip only those.
+                let mut pruned = document.clone();
+                let unknown = unknown::prune(&mut pruned);
+                if !unknown.is_empty()
+                    && let Ok(mut settings) = pruned.try_into::<Self>()
+                {
+                    eprintln!(
+                        "settings entries this build cannot read were skipped and will be kept ({error}): {}",
+                        unknown.describe().join(", ")
+                    );
+                    settings.unknown_entries = unknown;
+                    return Ok((settings, dirty));
+                }
                 // A bad newly-introduced scalar must not take providers, tray
                 // widgets, or schedules down with it.
                 let stripped_time_format = document
@@ -2147,8 +2565,15 @@ impl Settings {
         let mut temporary = tempfile::NamedTempFile::new_in(parent)
             .with_context(|| format!("create temporary settings in {}", parent.display()))?;
         use std::io::Write;
+        let encoded = if self.unknown_entries.is_empty() {
+            toml::to_string_pretty(self)?
+        } else {
+            let mut document = toml::Value::try_from(self)?;
+            self.unknown_entries.restore_into(&mut document);
+            toml::to_string_pretty(&document)?
+        };
         temporary
-            .write_all(toml::to_string_pretty(self)?.as_bytes())
+            .write_all(encoded.as_bytes())
             .context("write temporary settings")?;
         temporary
             .as_file()
@@ -2532,6 +2957,13 @@ impl Settings {
         #[cfg(windows)]
         gpui::set_software_rendering(self.software_rendering);
         crate::notifications::set_sound_enabled(self.notifications.sound);
+        crate::notifications::set_follow_do_not_disturb(self.notifications.follow_do_not_disturb);
+        crate::game_mode::apply(
+            self.game_mode,
+            self.notifications.game_mode_changes,
+            &self.game_mode_games,
+            &self.game_mode_ignored,
+        );
         crate::popup::apply_popup_appearance(
             self.bottom_bar_size,
             self.popup_corner_radius,
@@ -3429,6 +3861,15 @@ fn migrate(document: &mut toml::Value, mut version: u32) -> Result<()> {
                 root.insert("version".into(), toml::Value::Integer(40));
                 version = 40;
             }
+            40 => {
+                // The taskbar widget is switched on after decoding, where its
+                // default widget can be built from the enabled providers.
+                document
+                    .as_table_mut()
+                    .context("settings root must be a TOML table")?
+                    .insert("version".into(), toml::Value::Integer(41));
+                version = 41;
+            }
             // Unknown future/gap versions: stamp current and keep decoding with
             // serde defaults rather than refusing to start.
             _ => {
@@ -4285,6 +4726,106 @@ enabled = ["codex"]
         assert!(!loaded.start_at_login);
         assert!(loaded.tray_widgets.is_empty());
         assert!(loaded.is_enabled(id(ProviderKind::Codex)));
+    }
+
+    fn settings_from_a_newer_build() -> String {
+        format!(
+            r#"version = {SETTINGS_VERSION}
+onboarding_completed = true
+start_at_login = false
+game_mode = "a-mode-from-the-future"
+
+[[instances]]
+id = "codex"
+driver = "codex"
+name = "Codex"
+enabled = true
+badge = "W"
+
+[[instances]]
+id = "future-provider"
+driver = "future_provider"
+name = "Future"
+enabled = true
+
+[instances.source]
+kind = "config_folder"
+
+[[instances]]
+id = "claude"
+driver = "claude"
+name = "Claude"
+enabled = true
+"#
+        )
+    }
+
+    #[test]
+    fn skips_entries_from_a_newer_build_instead_of_resetting() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.toml");
+        fs::write(&path, settings_from_a_newer_build()).unwrap();
+
+        let loaded = Settings::load_or_create(&path).unwrap();
+        let instances = loaded
+            .instances
+            .iter()
+            .map(|instance| (instance.id.as_str(), instance.badge.as_str()))
+            .collect::<Vec<_>>();
+        assert_eq!(instances, [("codex", "W"), ("claude", "")]);
+        assert!(!loaded.start_at_login);
+        assert_eq!(loaded.game_mode, GameMode::default());
+        assert!(!path.with_extension("toml.corrupt").exists());
+        assert_eq!(
+            loaded.unknown_entries.describe(),
+            ["game_mode", "instances[]"]
+        );
+    }
+
+    #[test]
+    fn saving_keeps_entries_from_a_newer_build() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.toml");
+        fs::write(&path, settings_from_a_newer_build()).unwrap();
+
+        let mut loaded = Settings::load_or_create(&path).unwrap();
+        loaded.start_at_login = true;
+        loaded.game_mode = GameMode::Always;
+        loaded.save(&path).unwrap();
+
+        let saved = fs::read_to_string(&path).unwrap();
+        assert!(saved.contains(r#"driver = "future_provider""#));
+        // A value this build writes is the user's current choice.
+        assert!(!saved.contains("a-mode-from-the-future"));
+        let reloaded = Settings::load_or_create(&path).unwrap();
+        assert!(reloaded.start_at_login);
+        assert_eq!(reloaded.game_mode, GameMode::Always);
+        assert_eq!(reloaded.instances.len(), 2);
+        assert_eq!(reloaded.unknown_entries.describe(), ["instances[]"]);
+
+        let mut future: toml::Value = toml::from_str(&saved).unwrap();
+        let instances = future["instances"].as_array().unwrap();
+        let restored = instances
+            .iter()
+            .find(|instance| instance["id"].as_str() == Some("future-provider"))
+            .unwrap();
+        assert_eq!(restored["source"]["kind"].as_str(), Some("config_folder"));
+        // Saving again must not duplicate the preserved instance.
+        reloaded.save(&path).unwrap();
+        future = toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(future["instances"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn readable_settings_are_saved_without_reordering() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.toml");
+        let settings = Settings::default();
+        settings.save(&path).unwrap();
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            toml::to_string_pretty(&settings).unwrap()
+        );
     }
 
     #[test]

@@ -11,6 +11,7 @@ pub(crate) enum Tab {
     Popup,
     Schedule,
     Tray,
+    Taskbar,
     Notifications,
     Advanced,
     Log,
@@ -20,12 +21,13 @@ pub(crate) enum Tab {
 
 impl Tab {
     /// Sidebar order.
-    pub(crate) const ALL: [Tab; 11] = [
+    pub(crate) const ALL: [Tab; 12] = [
         Tab::General,
         Tab::Providers,
         Tab::Popup,
         Tab::Schedule,
         Tab::Tray,
+        Tab::Taskbar,
         Tab::Notifications,
         Tab::Appearance,
         Tab::Advanced,
@@ -42,6 +44,7 @@ impl Tab {
             Self::Popup => "customize",
             Self::Schedule => "schedule",
             Self::Tray => "tray",
+            Self::Taskbar => "taskbar",
             Self::Notifications => "notifications",
             Self::Advanced => "advanced",
             Self::Log => "log",
@@ -58,6 +61,7 @@ impl Tab {
             Self::Popup => crate::i18n::tr("customize"),
             Self::Schedule => crate::i18n::tr("limit-activation"),
             Self::Tray => crate::i18n::tr("tray"),
+            Self::Taskbar => crate::i18n::tr("taskbar"),
             Self::Notifications => crate::i18n::tr("notifications"),
             Self::Advanced => crate::i18n::tr("advanced"),
             Self::Log => crate::i18n::tr("log"),
@@ -74,6 +78,7 @@ impl Tab {
             Self::Popup => "color/apps-24.svg",
             Self::Schedule => "color/calendar-clock-24.svg",
             Self::Tray => "color/chat-24.svg",
+            Self::Taskbar => "color/gauge-24.svg",
             Self::Notifications => "color/alert-badge-24.svg",
             Self::Appearance => "color/paint-brush-24.svg",
             Self::Advanced => "color/settings-24.svg",

@@ -17,7 +17,7 @@ use windows_sys::Win32::{
         },
         Gdi::{
             CreateRectRgn, CreateRoundRectRgn, GetMonitorInfoW, HMONITOR, MONITOR_DEFAULTTONEAREST,
-            MONITORINFO, MonitorFromPoint, SetWindowRgn,
+            MONITOR_DEFAULTTONULL, MONITORINFO, MonitorFromPoint, MonitorFromWindow, SetWindowRgn,
         },
     },
     UI::{
@@ -25,10 +25,10 @@ use windows_sys::Win32::{
         HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI},
         Shell::{DefSubclassProc, SetWindowSubclass},
         WindowsAndMessaging::{
-            EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE, GWL_STYLE, GetWindowLongPtrW, GetWindowRect,
-            HTCLIENT, HWND_TOPMOST, MA_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, SWP_FRAMECHANGED,
-            SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER,
-            SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow,
+            EVENT_SYSTEM_FOREGROUND, FindWindowExW, GWL_EXSTYLE, GWL_STYLE, GetWindowLongPtrW,
+            GetWindowRect, HTCLIENT, HWND_TOPMOST, MA_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE,
+            SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
+            SWP_NOZORDER, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow,
             WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_DISPLAYCHANGE, WM_MOUSEACTIVATE,
             WM_NCCALCSIZE, WM_NCHITTEST, WM_SETTINGCHANGE, WS_CAPTION, WS_EX_APPWINDOW,
             WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW,
@@ -72,6 +72,10 @@ impl Rect {
 pub(crate) struct Monitor {
     pub(crate) bounds: Rect,
     pub(crate) work: Rect,
+    /// The Windows taskbar on this monitor, when it has one. Other appbars
+    /// (e.g. the PowerToys Command Palette dock) also shrink `work`, so only
+    /// this rectangle tells which edge the taskbar is on.
+    pub(crate) taskbar: Option<Rect>,
     pub(crate) dpi: u32,
 }
 
@@ -250,9 +254,40 @@ pub(crate) fn monitor_for_point(x: i32, y: i32) -> Monitor {
         Monitor {
             bounds: Rect::from_win32(info.rcMonitor),
             work: Rect::from_win32(info.rcWork),
+            taskbar: taskbar_on(monitor),
             dpi: monitor_dpi(monitor),
         }
     }
+}
+
+/// The frame of the primary or secondary taskbar that lives on `monitor`.
+fn taskbar_on(monitor: HMONITOR) -> Option<Rect> {
+    for class in ["Shell_TrayWnd", "Shell_SecondaryTrayWnd"] {
+        let class: Vec<u16> = class.encode_utf16().chain(Some(0)).collect();
+        let mut after: HWND = std::ptr::null_mut();
+        loop {
+            let taskbar = unsafe {
+                FindWindowExW(
+                    std::ptr::null_mut(),
+                    after,
+                    class.as_ptr(),
+                    std::ptr::null(),
+                )
+            };
+            if taskbar.is_null() {
+                break;
+            }
+            after = taskbar;
+            if unsafe { MonitorFromWindow(taskbar, MONITOR_DEFAULTTONULL) } != monitor {
+                continue;
+            }
+            let rect = window_rect(taskbar);
+            if rect.width() > 0 && rect.height() > 0 {
+                return Some(rect);
+            }
+        }
+    }
+    None
 }
 
 unsafe fn monitor_info(monitor: HMONITOR) -> MONITORINFO {

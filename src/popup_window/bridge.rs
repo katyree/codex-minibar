@@ -195,6 +195,23 @@ pub(super) fn update_version_from_phase(phase: &UpdatePhase) -> Option<String> {
     }
 }
 
+/// Sends a worker the poll intervals it should use right now. Workers ignore
+/// an unchanged interval, so resending after any change is safe.
+fn send_refresh_intervals(
+    provider: ProviderId,
+    commands: &std::sync::mpsc::Sender<WorkerCommand>,
+    settings: &Settings,
+) {
+    if let Some(instance) = settings.instance(provider) {
+        let _ = commands.send(WorkerCommand::SetLimitRefreshInterval(
+            crate::provider::limit_refresh_interval(instance),
+        ));
+    }
+    let _ = commands.send(WorkerCommand::SetUsageRefreshInterval(
+        crate::provider::usage_refresh_interval(settings),
+    ));
+}
+
 /// A visible popup or open Settings window needs frame-rate polling (outside
 /// click / Escape dismissal, live preview, settings pushes).
 fn bridge_surface_active() -> bool {
@@ -204,7 +221,14 @@ fn bridge_surface_active() -> bool {
 /// Idle tick is short enough for the 250 ms system-theme check, stream deck
 /// and update toasts; window messages (tray) wake the idle wait immediately.
 fn bridge_poll_interval(active: bool) -> Duration {
-    Duration::from_millis(if active { 16 } else { 100 })
+    Duration::from_millis(if active {
+        16
+    } else if crate::game_mode::is_active() {
+        // Still meets the 250 ms theme check while waking less often.
+        250
+    } else {
+        100
+    })
 }
 
 pub(super) fn start_background_bridge(state: Arc<AppState>) {
@@ -240,6 +264,8 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
     thread::spawn(move || {
         let streamdeck_rx = crate::streamdeck::start_server(Arc::clone(&state));
         let mut tray = TrayManager::new();
+        // Registered from this thread so WM_HOTKEY reaches its message pump.
+        let mut hotkey = crate::hotkey::Registration::default();
         let fallback_attempt = state.last_activation_at;
         let mut notification_settings = state.settings.notifications.clone();
         // Keyed by instance id.
@@ -273,6 +299,11 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
             ui.set_popup_error(error.to_string());
             flush_popup_ui(&ui);
         }
+
+        crate::taskbar::register_bridge_thread();
+        crate::taskbar::publish_limits(&state.current_limits());
+        crate::taskbar::publish_settings(&state.settings);
+        crate::cmdpal::publish_settings(&state.settings);
 
         // First frame: the renderer seeds itself from settings, then takes
         // this complete snapshot (errors, activation text, update state).
@@ -366,6 +397,9 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
             ) {
                 ui.set_popup_error(error.to_string());
             }
+            crate::taskbar::publish_limits(&state.current_limits());
+            crate::taskbar::publish_settings(&settings);
+            crate::cmdpal::publish_settings(&settings);
             for (provider, commands) in state.worker_commands() {
                 let _ = commands.send(WorkerCommand::SetAutomaticActivation(
                     crate::provider::automatic_activation(provider, &settings),
@@ -376,14 +410,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
                 let _ = commands.send(WorkerCommand::SetAutoActivationPauses(
                     crate::provider::auto_activation_pauses_for(provider, &settings),
                 ));
-                if let Some(instance) = settings.instance(provider) {
-                    let _ = commands.send(WorkerCommand::SetLimitRefreshInterval(
-                        Duration::from_secs(instance.refresh_interval().seconds()),
-                    ));
-                }
-                let _ = commands.send(WorkerCommand::SetUsageRefreshInterval(Duration::from_secs(
-                    settings.usage_refresh_interval.seconds(),
-                )));
+                send_refresh_intervals(provider, &commands, &settings);
                 // The worker reloads the selected history range immediately,
                 // so changes are reflected in the open popup without asking the
                 // user to restart the application.
@@ -514,6 +541,9 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
                         }
                         popup::show_on_primary();
                     }
+                    crate::streamdeck::Command::OpenCommandPaletteSettings => {
+                        crate::settings_window::open_command_palette();
+                    }
                 }
             }
         };
@@ -543,7 +573,9 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
                     &mut live_settings,
                 );
                 drain_updates(&mut ui, &mut tray, &mut update_phase, &mut widgets);
-                if pump_tray_and_dismiss(&tray, &settings_tx, &state, &mut ui) {
+                pump_popup_hotkey(&mut hotkey, &live_settings, &mut ui);
+                let exit = pump_taskbar_actions(&settings_tx, &mut ui);
+                if exit || pump_tray_and_dismiss(&tray, &settings_tx, &state, &mut ui) {
                     drop(tray);
                     AppState::flush_limits_persistence();
                     state.shutdown_worker();
@@ -577,7 +609,14 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
                 &mut live_settings,
             );
             drain_updates(&mut ui, &mut tray, &mut update_phase, &mut widgets);
-            if pump_tray_and_dismiss(&tray, &settings_tx, &state, &mut ui) {
+            if crate::game_mode::take_transition() {
+                for (provider, commands) in state.worker_commands() {
+                    send_refresh_intervals(provider, &commands, &live_settings);
+                }
+            }
+            pump_popup_hotkey(&mut hotkey, &live_settings, &mut ui);
+            let exit = pump_taskbar_actions(&settings_tx, &mut ui);
+            if exit || pump_tray_and_dismiss(&tray, &settings_tx, &state, &mut ui) {
                 drop(tray);
                 AppState::flush_limits_persistence();
                 state.shutdown_worker();
@@ -731,6 +770,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
                     } else {
                         ui.error = None;
                     }
+                    crate::taskbar::publish_limits(&limits);
                     if provider == ProviderId::primary(ProviderKind::Codex) {
                         ui.last_activation =
                             format_last_activation(limits.get(provider), fallback_attempt);
@@ -923,6 +963,100 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
             }
         }
     });
+}
+
+/// Keeps the popup shortcut registered as configured and toggles the popup
+/// when it is pressed, the same way a tray click does.
+fn pump_popup_hotkey(
+    hotkey: &mut crate::hotkey::Registration,
+    settings: &Settings,
+    ui: &mut UiState,
+) {
+    // Settings releases the shortcut while it records a new one; the flag
+    // cannot outlive the window that set it.
+    let recording = crate::hotkey::is_suspended() && crate::settings_window::is_open();
+    if hotkey.sync(settings.popup_hotkey.filter(|_| !recording)) {
+        crate::settings_window::refresh_hotkey_status();
+    }
+    if !crate::hotkey::take_pressed() || recording {
+        return;
+    }
+    if popup::is_visible() && !popup::is_closing() {
+        // Settings uses the popup as a live preview; keep it, as a tray
+        // click does.
+        if !crate::settings_window::is_open() {
+            popup::hide();
+        }
+    } else {
+        flush_popup_ui(ui);
+        popup::show_near_cursor();
+    }
+}
+
+/// Clicks and menu choices from the taskbar widgets.
+/// Performs the widgets' actions; returns whether the app should exit.
+fn pump_taskbar_actions(settings_tx: &Sender<Settings>, ui: &mut UiState) -> bool {
+    for action in crate::taskbar::take_actions() {
+        match action {
+            crate::taskbar::Action::Open {
+                provider,
+                anchor,
+                page,
+            } => {
+                if popup::is_visible() {
+                    // Same toggle as a tray click; Settings keeps its preview.
+                    if !crate::settings_window::is_open() {
+                        popup::hide();
+                    }
+                } else {
+                    use crate::settings::TaskbarClick;
+                    match (provider, page) {
+                        (Some(provider), TaskbarClick::Nearest) => {
+                            crate::popup_window::request_nearest_view(provider)
+                        }
+                        (Some(provider), TaskbarClick::Tab) => {
+                            crate::popup_window::request_provider_view(provider)
+                        }
+                        _ => crate::popup_window::request_home_view(),
+                    }
+                    flush_popup_ui(ui);
+                    popup::show_beside(anchor.0, anchor.1);
+                }
+            }
+            crate::taskbar::Action::Edit(id) => {
+                show_settings_preview(ui);
+                crate::settings_window::open_taskbar_widget(id);
+            }
+            crate::taskbar::Action::Settings => {
+                show_settings_preview(ui);
+                crate::settings_window::open_taskbar();
+            }
+            crate::taskbar::Action::AppSettings => {
+                show_settings_preview(ui);
+                crate::settings_window::open();
+            }
+            crate::taskbar::Action::Hide => {
+                crate::settings_window::persist_update(settings_tx.clone(), |settings| {
+                    settings.taskbar.enabled = false;
+                });
+            }
+            crate::taskbar::Action::Update => {
+                // Failures are reported on the update card.
+                let _ = crate::updater::apply_pending_update();
+            }
+            crate::taskbar::Action::Exit => return true,
+        }
+    }
+    false
+}
+
+/// Settings opened from a widget keep the popup up as a live preview, like
+/// Settings opened from the tray menu.
+fn show_settings_preview(ui: &mut UiState) {
+    flush_popup_ui(ui);
+    if !popup::is_visible() || popup::is_closing() {
+        popup::show_near_cursor();
+    }
 }
 
 #[cfg(windows)]

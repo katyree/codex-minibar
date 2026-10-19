@@ -29,7 +29,7 @@ fn run() -> Result<()> {
     }
     let mut settings = Settings::load_or_create(&path)?;
     settings.language.apply();
-    show_post_update_success_if_needed();
+    let just_updated = show_post_update_success_if_needed();
     if let Err(error) = settings.reconcile_startup_from_registry(&path) {
         eprintln!("failed to reconcile startup setting: {error:#}");
     }
@@ -118,6 +118,7 @@ fn run() -> Result<()> {
         usage_actions_rx: Mutex::new(Some(usage_actions_rx)),
         updates: Arc::clone(&updates),
     });
+    codex_minibar::game_mode::set_settings_writer(state.settings_tx.clone());
     codex_minibar::updater::install_runtime(Arc::clone(&updates), {
         let state = Arc::clone(&state);
         move || state.shutdown_worker()
@@ -126,6 +127,7 @@ fn run() -> Result<()> {
     // Initializes the tray accent before any popup can be shown.
     codex_minibar::theme::apply_appearance(state.settings.theme, state.settings.accent_color);
     codex_minibar::popup_window::start(Arc::clone(&state));
+    codex_minibar::whats_new::start(&state.settings, just_updated);
     if onboarding_needed {
         codex_minibar::settings_window::open_onboarding();
     }

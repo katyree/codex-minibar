@@ -2,6 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      whats_new:
+        description: Require a "What's new" summary (data/releases/<version>/whats-new.en.md)
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -36,6 +41,17 @@ jobs:
           }
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "version $version"
+
+      # The app fetches this summary from main after updating; releasing
+      # without one must be a deliberate choice.
+      - name: Check release summary
+        if: ${{ inputs.whats_new }}
+        shell: pwsh
+        run: |
+          $summary = "data/releases/${{ steps.version.outputs.version }}/whats-new.en.md"
+          if (-not (Test-Path -LiteralPath $summary)) {
+            throw "Missing $summary. Write the release summary (see data/releases/README.md) or run with whats_new unchecked."
+          }
 
   build:
     name: Build ${{ matrix.arch }}

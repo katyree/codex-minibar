@@ -146,6 +146,8 @@ pub(crate) struct Fx {
     tweens: HashMap<u64, Tween>,
     stretches: HashMap<u64, IndicatorStretch>,
     rolls: HashMap<u64, Roll>,
+    /// Scope -> (previous, latest) frame it was rendered in.
+    scopes: HashMap<u64, (u64, u64)>,
     frame: u64,
     now: Option<Instant>,
     enabled: bool,
@@ -200,6 +202,8 @@ impl Fx {
                 .retain(|_, stretch| frame.wrapping_sub(stretch.last_frame) < 240);
             self.rolls
                 .retain(|_, roll| frame.wrapping_sub(roll.last_frame) < 240);
+            self.scopes
+                .retain(|_, (_, latest)| frame.wrapping_sub(*latest) < 240);
         }
     }
 
@@ -360,6 +364,32 @@ impl Fx {
     /// Boolean convenience: 0 → 1 while `on`.
     pub(crate) fn toggle(&mut self, id: u64, on: bool, duration: Duration) -> f32 {
         self.value(id, if on { 1.0 } else { 0.0 }, duration)
+    }
+
+    /// Records that `scope` (e.g. a provider section) renders this frame.
+    pub(crate) fn mark_scope(&mut self, scope: u64) {
+        let frame = self.frame;
+        let entry = self.scopes.entry(scope).or_insert((0, 0));
+        if entry.1 != frame {
+            *entry = (entry.1, frame);
+        }
+    }
+
+    /// Like [`Fx::appear`], but only grows in when `scope` was already on
+    /// screen in the previous frame. Content that mounts together with its
+    /// scope (popup open, page switch) shows at full size instead.
+    pub(crate) fn appear_in(&mut self, id: u64, scope: u64, duration: Duration) -> f32 {
+        if !self.tweens.contains_key(&id) {
+            let frame = self.frame;
+            let previous = match self.scopes.get(&scope) {
+                Some(&(previous, latest)) if latest == frame => previous,
+                Some(&(_, latest)) => latest,
+                None => 0,
+            };
+            let continuing = previous != 0 && previous.wrapping_add(1) == frame;
+            self.snap(id, if continuing { 0.0 } else { 1.0 });
+        }
+        self.value(id, 1.0, duration)
     }
 
     /// 0 → 1 from the first frame `id` is seen, then 1: content that arrives
@@ -558,6 +588,27 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn scoped_appear_grows_only_inside_an_already_visible_scope() {
+        let duration = Duration::from_millis(200);
+        let mut fx = Fx::default();
+        // Mounting together with its scope (popup open, page switch).
+        fx.begin_frame(true);
+        fx.mark_scope(7);
+        assert_eq!(fx.appear_in(1, 7, duration), 1.0);
+        assert!(!fx.is_animating());
+        // Arriving while the scope was already on screen last frame.
+        fx.begin_frame(true);
+        fx.mark_scope(7);
+        assert_eq!(fx.appear_in(2, 7, duration), 0.0);
+        assert!(fx.is_animating());
+        // The scope skipped a frame (another page was shown).
+        fx.begin_frame(true);
+        fx.begin_frame(true);
+        fx.mark_scope(7);
+        assert_eq!(fx.appear_in(3, 7, duration), 1.0);
     }
 
     #[test]

@@ -1219,6 +1219,12 @@ found-an-official-grok-cli-sign-in-on-this-pc = На этом компьютер
 not-found-run-grok-login-before-enabling-it = Не найдена. Выполните grok login перед включением.
 
 # src/settings_window/onboarding.rs
+found-an-official-command-code-cli-sign-in-on-this-pc = На этом компьютере найдена официальная авторизация Command Code CLI.
+
+# src/settings_window/onboarding.rs
+not-found-run-cmdc-login-before-enabling-it = Не найдена. Выполните cmdc login перед включением.
+
+# src/settings_window/onboarding.rs
 found-kiro-ide-kiro-crew-or-a-signed-in-kiro-cli = Найдены Kiro IDE, Kiro Crew или авторизованный Kiro CLI.
 
 # src/settings_window/onboarding.rs
@@ -1845,6 +1851,9 @@ cursor-app-folder = Папка приложения Cursor
 grok-cli-folder = Папка Grok CLI
 
 # src/settings_window/providers.rs
+command-code-cli-folder = Папка Command Code CLI
+
+# src/settings_window/providers.rs
 kiro-ide-folder = Папка Kiro IDE
 
 # src/settings_window/providers.rs
@@ -1878,6 +1887,9 @@ reads-subscription-quota-from-your-existing-official-agy-windows = Читает 
 reads-supergrok-subscription-credits-from-your-existing-official = Читает кредиты подписки SuperGrok из существующей официальной авторизации Grok CLI.
 
 # src/settings_window/providers.rs
+reads-command-code-5h-weekly-and-monthly-credits-from-your-existin = Читает 5-часовые, недельные и месячные кредиты Command Code из существующей официальной авторизации CLI.
+
+# src/settings_window/providers.rs
 fetches-kiro-s-live-monthly-credits-with-its-shared-sign-in-recog = Получает актуальные месячные кредиты Kiro через общую авторизацию; распознаёт установки IDE, Crew и CLI.
 
 # src/settings_window/providers.rs
@@ -1900,6 +1912,9 @@ antigravity-app = Приложение Antigravity
 
 # src/settings_window/providers.rs
 grok-cli = Grok CLI
+
+# src/settings_window/providers.rs
+command-code-cli = Command Code CLI
 
 # src/settings_window/providers.rs
 kiro-ide = Kiro IDE
@@ -2227,6 +2242,9 @@ folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut = Папка �
 # application
 folder-with-grok-exe-grok-cmd-or-grok-ps1-leave-empty-to-find-it = Папка с grok.exe, grok.cmd или grok.ps1. Оставьте пустым для автоматического поиска.
 
+# src/settings_window/providers.rs
+folder-with-cmdc-cmd-or-cmdc-ps1-leave-empty-to-find-it-automati = Папка с cmdc.cmd или cmdc.ps1. Оставьте пустым для автоматического поиска.
+
 # application
 folder-containing-kiro-exe-or-the-executable-itself-leave-empty-t = Папка с Kiro.exe или сам исполняемый файл. Оставьте пустым для автоматического поиска.
 
@@ -2486,7 +2504,7 @@ openrouter-keys-enabled = Включён
 openrouter-keys-delete = Удалить
 
 
-openrouter-keys-delete-tracked = Этот ключ использует приложение. Сначала удалите его в настройках.
+openrouter-keys-delete-tracked = Minibar также перестанет его отслеживать.
 
 
 openrouter-keys-saving = Сохранение…
@@ -2596,6 +2614,24 @@ openrouter-keys-not-a-management-key = Этот ключ не может упр�
 
 openrouter-keys-key-not-found = Этот ключ больше не существует.
 
+
+openrouter-keys-untrack = Убрать из приложения
+
+
+openrouter-keys-untracking = Удаление…
+
+
+openrouter-keys-untrack-title = Перестать отслеживать «{ $name }»?
+
+
+openrouter-keys-untrack-message = Minibar забудет этот ключ. В OpenRouter он продолжит работать.
+
+
+openrouter-keys-tracked-here = Minibar отслеживает этот ключ.
+
+
+openrouter-keys-manage-hint = Добавьте ключ управления в настройках, чтобы создавать, изменять и удалять ключи.
+
 # src/settings_window/notifications.rs
 notification-sounds = Звуки уведомлений
 
@@ -2694,3 +2730,208 @@ muse-session-missing = Connect your signed-in Muse account from Chrome to read w
 muse-remove-session = Remove Muse session
 muse-remove-session-help = Minibar will forget the saved session credential. Your Chrome sign-in stays unchanged.
 muse-session-removed = Muse session removed
+# src/whats_new.rs
+no-summary-for-this-version = Для этой версии пока нет сводки. Полный список изменений есть на GitHub.
+
+# src/whats_new.rs
+couldn-t-load-what-s-new = Не удалось загрузить новинки. Проверьте подключение или откройте список изменений на GitHub.
+
+# src/whats_new.rs
+full-release-notes = Полный список изменений
+
+# src/settings_window/about.rs
+show-what-s-new-after-updating = Показывать новинки после обновления
+
+# src/settings_window/about.rs
+a-short-summary-of-the-release-once-it-s-installed = Краткая сводка о версии сразу после установки.
+
+# src/settings_window/about.rs
+view = Открыть
+
+# src/settings_window/general.rs
+popup-shortcut = Сочетание для popup
+popup-shortcut-description = Нажмите его в любом месте Windows, чтобы показать или скрыть popup.
+shortcut-not-set = Не задано
+press-a-shortcut = Нажмите сочетание…
+popup-shortcut-recording-hint = Esc — отмена. Backspace удаляет сочетание.
+popup-shortcut-needs-modifier = Добавьте Ctrl, Alt или Win либо используйте F13–F24.
+popup-shortcut-in-use = Это сочетание уже занято другим приложением. Выберите другое.
+clear-shortcut = Удалить сочетание
+taskbar = Панель задач
+preview = Предпросмотр
+taskbar-page-caption = Живые виджеты использования прямо на панели задач Windows, рядом с часами. Они следуют теме панели задач; щелчок по виджету открывает окно на его провайдере.
+taskbar-show-widgets = Показывать виджеты на панели задач
+taskbar-show-widgets-description = Рисует виджеты ниже прямо на панели задач Windows.
+taskbar-position = Расположение
+taskbar-position-description = Где виджеты находятся на панели задач. Начало панели лучше подходит для значков по центру.
+taskbar-position-tray = Рядом с областью уведомлений
+taskbar-position-start = В начале панели задач
+taskbar-widgets = Виджеты
+taskbar-no-widgets = Виджетов пока нет
+taskbar-no-widgets-description = Добавьте виджет, чтобы показать лимит на панели задач.
+taskbar-show-provider-icon = Показывать значок провайдера
+taskbar-style-glance = Сводка
+taskbar-style-glance-hint = Значок провайдера и две строки текста, как кнопка погоды.
+taskbar-style-rings-hint = Кольцо прогресса для каждого лимита со значением рядом.
+taskbar-style-bars-hint = Тонкие полосы прогресса рядом со значком провайдера.
+taskbar-menu-open = Открыть Codex Minibar
+taskbar-menu-settings = Настройки виджетов панели задач
+taskbar-menu-hide = Скрыть виджеты с панели задач
+taskbar-card-left = Осталось { $value }
+taskbar-card-used = Использовано { $value }
+taskbar-card-resets = Сброс через { $time } · { $clock }
+taskbar-card-no-data = Ожидание данных
+short-5h = 5ч
+short-7d = 7д
+taskbar-style-nested = Вложенные кольца
+taskbar-style-dials = Циферблаты
+taskbar-style-meters = Шкалы
+taskbar-style-nested-hint = Концентрические кольца на месте одного, при желании со значениями рядом.
+taskbar-style-dials-hint = Маленькое кольцо на каждую квоту с числом внутри.
+taskbar-style-meters-hint = Тонкие столбики уровня, как индикатор заряда.
+taskbar-show-provider-icon-description = Значок провайдера в начале виджета.
+taskbar-show-labels = Показывать подписи
+taskbar-show-labels-description = Короткие названия вроде 5ч и 7д рядом со значениями.
+taskbar-show-values = Показывать проценты
+taskbar-show-values-description = Проценты квот на виджете.
+taskbar-show-pace = Показывать темп
+taskbar-show-pace-description = Отметка, где было бы использование сейчас при равномерном расходе.
+taskbar-menu-edit = Изменить этот виджет
+taskbar-content = Содержимое
+taskbar-content-hint = Что виджет пишет рядом с графикой.
+taskbar-reset-time = Время сброса
+taskbar-reset-time-description = Когда сбросится каждая квота.
+taskbar-reset-off = Не показывать
+taskbar-reset-countdown = Сколько осталось
+taskbar-reset-clock = Время на часах
+taskbar-cycle = Переключать виджеты колесом мыши
+taskbar-cycle-description = Показывает один виджет за раз; прокрутите колесо над ним, чтобы переключиться на следующий.
+taskbar-card-tokens = { $count } токенов
+taskbar-click = По щелчку открывать
+taskbar-click-description = Какую страницу попапа открывает щелчок по виджету.
+taskbar-click-nearest = Главную, а если провайдера там нет — его вкладку
+taskbar-click-tab = Вкладку провайдера
+taskbar-click-home = Главную
+
+# src/settings_window/notifications.rs
+follow-do-not-disturb = Пауза в режиме «Не беспокоить»
+
+# src/settings_window/notifications.rs
+follow-do-not-disturb-description = Пока в Windows включён режим «Не беспокоить» или фокусировка, уведомления пропускаются, а звуки отключены. Результаты ваших действий по-прежнему показываются.
+
+# src/settings_window/advanced.rs
+performance = Производительность
+
+# src/settings_window/advanced.rs
+game-mode = Игровой режим
+
+# src/settings_window/advanced.rs
+game-mode-description = Реже проверяет лимиты и статистику, работает с низким приоритетом и приостанавливает уведомления. «Автоматически» включает его, когда игра выходит на передний план, и держит, пока она не закроется.
+
+# src/settings.rs
+game-mode-off = Выключен
+
+# src/settings.rs
+game-mode-automatic = Автоматически
+
+# src/settings.rs
+game-mode-always = Всегда
+
+# src/settings_window/notifications.rs
+notify-game-mode-changes = Смена игрового режима
+
+# src/settings_window/notifications.rs
+notify-game-mode-changes-description = Сообщает, когда игровой режим включается или выключается
+
+# src/notifications.rs
+game-mode-on-title = Игровой режим включён
+
+# src/notifications.rs
+game-mode-on-body = Лимиты проверяются реже, уведомления приостановлены
+
+# src/notifications.rs
+game-mode-on-game-body = Запущена { $game }. Лимиты проверяются реже, уведомления приостановлены
+
+# src/notifications.rs
+not-a-game = Это не игра
+
+# src/settings_window/advanced.rs
+add-a-game = Добавить игру
+
+# src/settings_window/advanced.rs
+add-a-game-description = Игры, известные Xbox Game Bar, и игры из Steam, Epic, GOG и Xbox определяются сами. Здесь можно добавить любую другую программу.
+
+# src/settings_window/advanced.rs
+never-a-game-path = Никогда не игра · { $path }
+
+# src/notifications.rs
+game-mode-off-title = Игровой режим выключен
+
+# src/notifications.rs
+game-mode-off-body = Обычные проверки и уведомления возобновлены
+
+# src/settings_window/command_palette.rs
+command-palette = Command Palette
+
+# src/settings_window/command_palette.rs
+stream-deck = Stream Deck
+
+# src/settings_window/command_palette.rs
+install = Установить
+
+# src/settings_window/command_palette.rs
+cmdpal-extension = Расширение Command Palette
+
+# src/settings_window/command_palette.rs
+cmdpal-description = Добавляет Minibar в PowerToys Command Palette: введите название провайдера, чтобы увидеть лимиты, или закрепите бэнды в доке. Для установки нужно подтверждение администратора.
+
+# src/settings_window/command_palette.rs
+cmdpal-installed-hint = Установлено. Введите «minibar» или название провайдера в Command Palette либо закрепите бэнды через «Изменить док».
+
+# src/settings_window/command_palette.rs
+cmdpal-downloading = Загрузка расширения…
+
+# src/settings_window/command_palette.rs
+cmdpal-installing = Ожидание установщика. Подтвердите запрос администратора, чтобы продолжить.
+
+# src/settings_window/command_palette.rs
+cmdpal-installing-short = Установка…
+
+# src/settings_window/command_palette.rs
+cmdpal-removing = Удаление расширения…
+
+# src/settings_window/command_palette.rs
+cmdpal-failed = Не удалось установить или удалить расширение.
+
+# src/settings_window/command_palette.rs
+cmdpal-reinstall = Переустановить
+
+# src/settings_window/command_palette.rs
+cmdpal-dock-bands = Бэнды дока
+
+# src/settings_window/command_palette.rs
+cmdpal-dock-bands-caption = Каждый бэнд появляется в настройках дока Command Palette. Закрепите его через «Изменить док» и выберите место.
+
+# src/settings_window/command_palette.rs
+cmdpal-no-bands = Нет бэндов
+
+# src/settings_window/command_palette.rs
+cmdpal-no-bands-description = Добавьте бэнд, чтобы закрепить лимиты провайдера в доке.
+
+# src/settings_window/command_palette.rs
+cmdpal-add-band = Добавить бэнд
+
+# src/settings_window/command_palette.rs
+cmdpal-band = Бэнд { $v0 }
+
+# src/settings_window/command_palette.rs
+cmdpal-band-removed = Бэнд удалён
+
+# src/settings_window/command_palette.rs
+cmdpal-remove-band = Удалить бэнд
+
+# src/settings_window/command_palette.rs
+cmdpal-content-hint = Док показывает бэнд как заголовок над подзаголовком.
+
+# src/settings_window/command_palette.rs
+cmdpal-indicators-hint = До 2 квот: одна занимает заголовок и подзаголовок, две — по строке.

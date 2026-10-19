@@ -646,6 +646,7 @@ mod platform {
         ) -> Result<()> {
             self.uses_light_theme = system_uses_light_theme();
             self.next_theme_check = Instant::now() + Duration::from_millis(250);
+            crate::taskbar::set_update_available(update_available);
             let language = crate::i18n::current_language();
             let menu_changed =
                 self.update_available != update_available || self.language != language;

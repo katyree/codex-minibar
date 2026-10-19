@@ -176,10 +176,15 @@ impl PopupRoot {
                 resting_width,
                 std::time::Duration::from_millis(300),
             );
+            // The indicator faces the taskbar, like Windows' own tab marks.
+            let indicator = div().absolute();
+            let indicator = if self.host.placement.top {
+                indicator.top_0()
+            } else {
+                indicator.bottom_0()
+            };
             strip = strip.child(
-                div()
-                    .absolute()
-                    .bottom_0()
+                indicator
                     .left(px(x + 9.0 - (indicator_width - resting_width) * 0.5))
                     .w(px(indicator_width))
                     .h(px(3.0))
@@ -276,7 +281,8 @@ impl PopupRoot {
                 ));
         }
 
-        div()
+        let corner = px((radius - 1.0).max(0.0));
+        let bar = div()
             .flex()
             .flex_row()
             .items_center()
@@ -286,13 +292,15 @@ impl PopupRoot {
             .pl(px(size.tab_padding_left() as f32))
             .pr(px(size.padding_right() as f32))
             .gap(px(size.column_spacing() as f32))
-            .border_t_1()
             .border_color(palette.card_stroke)
-            .bg(palette.footer_background)
-            .rounded_b(px((radius - 1.0).max(0.0)))
-            .child(tabs_viewport)
-            .child(actions)
-            .into_any_element()
+            .bg(palette.footer_background);
+        // By a top taskbar the bar caps the capsule instead of closing it.
+        let bar = if self.host.placement.top {
+            bar.border_b_1().rounded_t(corner)
+        } else {
+            bar.border_t_1().rounded_b(corner)
+        };
+        bar.child(tabs_viewport).child(actions).into_any_element()
     }
 
     #[allow(clippy::too_many_arguments)]

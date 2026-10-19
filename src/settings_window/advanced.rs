@@ -1,12 +1,16 @@
-//! Advanced: rendering, settings import/export, clearing Usage data,
+//! Advanced: game mode, rendering, settings import/export, clearing Usage data,
 //! factory reset.
 
-use gpui::{AnyElement, Context, PathPromptOptions};
+use gpui::{
+    AnyElement, Context, IntoElement, ParentElement, PathPromptOptions, SharedString, Styled, div,
+    px,
+};
 
 use super::kit::{self, Button, Kit, Row};
 use super::persistence;
 use super::window::SettingsWindow;
-use crate::settings::Settings;
+use crate::popup_window::ui::fx;
+use crate::settings::{GameMode, Settings};
 use crate::worker::UsageAction;
 
 fn action_row(
@@ -106,14 +110,154 @@ impl SettingsWindow {
                 }),
             )]
         });
-        vec![
+        let game_mode = self.settings.game_mode;
+        let games = self.games_card(k, cx);
+        let games = kit::collapsible(
+            k,
+            fx::key("advanced-game-mode-games"),
+            game_mode == GameMode::Automatic,
+            move |_| div().pt(px(8.0)).child(games).into_any_element(),
+        );
+        let performance = kit::card_of(k, |k| {
+            vec![kit::dropdown_row(
+                k,
+                "advanced-game-mode",
+                crate::i18n::tr("game-mode"),
+                Some(crate::i18n::tr("game-mode-description")),
+                GameMode::ALL
+                    .iter()
+                    .map(|mode| SharedString::from(mode.label()))
+                    .collect(),
+                game_mode.index(),
+                false,
+                Self::h(cx, |this, index: usize, _, cx| {
+                    let mode = GameMode::from_index(index as i32);
+                    this.edit(cx, move |settings| settings.game_mode = mode)
+                }),
+            )]
+        });
+        let mut page = vec![
+            kit::section_heading(k, crate::i18n::tr("performance")),
+            performance,
+        ];
+        page.extend(games);
+        page.extend([
             kit::section_heading(k, crate::i18n::tr("rendering")),
             rendering,
             kit::section_heading(k, crate::i18n::tr("backup")),
             backup,
             kit::section_heading(k, crate::i18n::tr("data")),
             data,
-        ]
+        ]);
+        page
+    }
+
+    /// Programs Automatic game mode treats (or never treats) as games beyond
+    /// the ones it recognizes on its own.
+    fn games_card(&mut self, k: &mut Kit, cx: &mut Context<Self>) -> AnyElement {
+        let entries = self
+            .settings
+            .game_mode_games
+            .iter()
+            .map(|path| (path.clone(), false))
+            .chain(
+                self.settings
+                    .game_mode_ignored
+                    .iter()
+                    .map(|path| (path.clone(), true)),
+            )
+            .collect::<Vec<_>>();
+        kit::card_of(k, |k| {
+            let mut rows = vec![action_row(
+                k,
+                "advanced-add-game",
+                "game-controller-fill",
+                crate::i18n::tr("add-a-game"),
+                crate::i18n::tr("add-a-game-description"),
+                Button::new("advanced-add-game", crate::i18n::tr("add"))
+                    .on_click(Self::h(cx, |this, (), _, cx| this.add_game(cx))),
+            )];
+            for (path, ignored) in entries {
+                let key = crate::game_mode::path_key(&path);
+                let id = format!(
+                    "advanced-game-{}-{}",
+                    if ignored { "ignored" } else { "added" },
+                    kit::hover_key(&key)
+                );
+                let description = if ignored {
+                    crate::i18n::format("never-a-game-path", &[("path", path.clone())])
+                } else {
+                    path.clone()
+                };
+                let remove = Self::h(cx, move |this, (), _, cx| {
+                    let key = key.clone();
+                    this.edit(cx, move |settings| {
+                        let list = if ignored {
+                            &mut settings.game_mode_ignored
+                        } else {
+                            &mut settings.game_mode_games
+                        };
+                        list.retain(|entry| crate::game_mode::path_key(entry) != key);
+                    })
+                });
+                let row = Row::new(format!("row-{id}"), crate::game_mode::file_stem(&path))
+                    .icon(kit::row_icon(
+                        k,
+                        if ignored {
+                            "prohibit-fill"
+                        } else {
+                            "game-controller-fill"
+                        },
+                    ))
+                    .description(k, description)
+                    .trailing(
+                        Button::icon_only(format!("{id}-remove"), "trash-fill")
+                            .danger()
+                            .ghost()
+                            .tooltip(crate::i18n::tr("remove"))
+                            .on_click(remove)
+                            .render(k),
+                    )
+                    .render(k);
+                rows.push(kit::appear(k, format!("{id}-appear"), row));
+            }
+            rows
+        })
+    }
+
+    /// Picks an executable and treats it as a game from now on.
+    fn add_game(&mut self, cx: &mut Context<Self>) {
+        let prompt = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some(crate::i18n::tr("add").into()),
+        });
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(paths))) = prompt.await else {
+                return;
+            };
+            let Some(path) = paths.into_iter().next() else {
+                return;
+            };
+            let path = path.to_string_lossy().into_owned();
+            let key = crate::game_mode::path_key(&path);
+            let _ = this.update(cx, |this, cx| {
+                this.edit(cx, move |settings| {
+                    settings
+                        .game_mode_ignored
+                        .retain(|entry| crate::game_mode::path_key(entry) != key);
+                    if !settings
+                        .game_mode_games
+                        .iter()
+                        .any(|entry| crate::game_mode::path_key(entry) == key)
+                    {
+                        settings.game_mode_games.push(path.clone());
+                    }
+                })
+            });
+        })
+        .detach();
     }
 
     fn export_settings(&mut self, cx: &mut Context<Self>) {

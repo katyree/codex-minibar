@@ -29,6 +29,7 @@ mod activation;
 mod advanced;
 mod appearance;
 mod backdrop;
+mod command_palette;
 mod customize;
 mod general;
 pub(crate) mod input;
@@ -40,6 +41,7 @@ mod notifications;
 mod onboarding;
 mod persistence;
 mod providers;
+mod taskbar;
 pub(crate) mod theme;
 mod tray;
 mod troubleshoot;
@@ -88,6 +90,12 @@ pub(crate) enum Command {
     Sync(Box<Settings>),
     DiscoveredBricks(BTreeMap<String, String>),
     OpenRouter(OpenRouterSettingsSnapshot),
+    /// The popup shortcut's registration status changed.
+    HotkeyStatus,
+    /// Open Settings on the Taskbar page, with one widget's editor open.
+    OpenTaskbar(Option<String>),
+    /// Open Settings on Integrations, where the Command Palette lives.
+    OpenCommandPalette,
 }
 
 fn post(command: Command) {
@@ -97,6 +105,21 @@ fn post(command: Command) {
 /// Open (or focus) the Settings window.
 pub fn open() {
     post(Command::Open);
+}
+
+/// Open (or focus) Settings on the Taskbar page.
+pub fn open_taskbar() {
+    post(Command::OpenTaskbar(None));
+}
+
+/// Open Settings on the Command Palette extension and its Dock bands.
+pub fn open_command_palette() {
+    post(Command::OpenCommandPalette);
+}
+
+/// Open Settings on the editor of the taskbar widget `id`.
+pub fn open_taskbar_widget(id: String) {
+    post(Command::OpenTaskbar(Some(id)));
 }
 
 /// Optimistic local edits own the displayed settings while the serial writer
@@ -123,6 +146,13 @@ pub fn open_onboarding() {
 /// navigates settings and changes popup-related options.
 pub(crate) fn is_open() -> bool {
     SETTINGS_OPEN.load(Ordering::SeqCst) || ONBOARDING_OPEN.load(Ordering::SeqCst)
+}
+
+/// Repaint Settings after the popup shortcut was (un)registered.
+pub(crate) fn refresh_hotkey_status() {
+    if SETTINGS_OPEN.load(Ordering::SeqCst) {
+        post(Command::HotkeyStatus);
+    }
 }
 
 /// Push a committed settings snapshot into the open window.
@@ -243,6 +273,30 @@ pub(crate) fn handle(command: Command, state: &Arc<AppState>, cx: &mut AsyncApp)
             root.openrouter = snapshot;
             cx.notify();
         }),
+        Command::HotkeyStatus => with_settings_window(cx, |_, cx| cx.notify()),
+        Command::OpenTaskbar(widget) => {
+            if focus_existing(&ONBOARDING_WINDOW, cx) {
+                return;
+            }
+            if !focus_existing(&SETTINGS_WINDOW, cx) {
+                open_settings_window(Arc::clone(state), cx);
+            }
+            with_settings_window(cx, |root, cx| {
+                root.open_tab(nav::Tab::Taskbar, cx);
+                if let Some(widget) = widget {
+                    root.open_taskbar_dialog(widget, cx);
+                }
+            });
+        }
+        Command::OpenCommandPalette => {
+            if focus_existing(&ONBOARDING_WINDOW, cx) {
+                return;
+            }
+            if !focus_existing(&SETTINGS_WINDOW, cx) {
+                open_settings_window(Arc::clone(state), cx);
+            }
+            with_settings_window(cx, |root, cx| root.open_tab(nav::Tab::Integrations, cx));
+        }
     }
 }
 

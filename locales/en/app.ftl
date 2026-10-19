@@ -1218,6 +1218,12 @@ found-an-official-grok-cli-sign-in-on-this-pc = Found an official Grok CLI sign-
 not-found-run-grok-login-before-enabling-it = Not found. Run grok login before enabling it.
 
 # src/settings_window/onboarding.rs
+found-an-official-command-code-cli-sign-in-on-this-pc = Found an official Command Code CLI sign-in on this PC.
+
+# src/settings_window/onboarding.rs
+not-found-run-cmdc-login-before-enabling-it = Not found. Run cmdc login before enabling it.
+
+# src/settings_window/onboarding.rs
 found-kiro-ide-kiro-crew-or-a-signed-in-kiro-cli = Found Kiro IDE, Kiro Crew, or a signed-in Kiro CLI.
 
 # src/settings_window/onboarding.rs
@@ -1844,6 +1850,9 @@ cursor-app-folder = Cursor app folder
 grok-cli-folder = Grok CLI folder
 
 # src/settings_window/providers.rs
+command-code-cli-folder = Command Code CLI folder
+
+# src/settings_window/providers.rs
 kiro-ide-folder = Kiro IDE folder
 
 # src/settings_window/providers.rs
@@ -1877,6 +1886,9 @@ reads-subscription-quota-from-your-existing-official-agy-windows = Reads subscri
 reads-supergrok-subscription-credits-from-your-existing-official = Reads SuperGrok subscription credits from your existing official Grok CLI sign-in.
 
 # src/settings_window/providers.rs
+reads-command-code-5h-weekly-and-monthly-credits-from-your-existin = Reads Command Code 5-hour, weekly, and monthly credits from your existing official CLI sign-in.
+
+# src/settings_window/providers.rs
 fetches-kiro-s-live-monthly-credits-with-its-shared-sign-in-recog = Fetches Kiro's live monthly credits with its shared sign-in; recognizes IDE, Crew, and CLI installs.
 
 # src/settings_window/providers.rs
@@ -1899,6 +1911,9 @@ antigravity-app = Antigravity app
 
 # src/settings_window/providers.rs
 grok-cli = Grok CLI
+
+# src/settings_window/providers.rs
+command-code-cli = Command Code CLI
 
 # src/settings_window/providers.rs
 kiro-ide = Kiro IDE
@@ -2221,6 +2236,9 @@ folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut = Folder with 
 # application
 folder-with-grok-exe-grok-cmd-or-grok-ps1-leave-empty-to-find-it = Folder with grok.exe, grok.cmd, or grok.ps1. Leave empty to find it automatically.
 
+# src/settings_window/providers.rs
+folder-with-cmdc-cmd-or-cmdc-ps1-leave-empty-to-find-it-automati = Folder with cmdc.cmd or cmdc.ps1. Leave empty to find it automatically.
+
 # application
 folder-containing-kiro-exe-or-the-executable-itself-leave-empty-t = Folder containing Kiro.exe, or the executable itself. Leave empty to find it automatically.
 
@@ -2479,7 +2497,7 @@ openrouter-keys-enabled = Enabled
 openrouter-keys-delete = Delete
 
 
-openrouter-keys-delete-tracked = This app uses this key. Remove it in Settings first.
+openrouter-keys-delete-tracked = Minibar also stops tracking it.
 
 
 openrouter-keys-saving = Saving…
@@ -2589,6 +2607,24 @@ openrouter-keys-not-a-management-key = This key can't manage other keys. Use a m
 
 openrouter-keys-key-not-found = This key no longer exists.
 
+
+openrouter-keys-untrack = Remove from app
+
+
+openrouter-keys-untracking = Removing…
+
+
+openrouter-keys-untrack-title = Stop tracking “{ $name }”?
+
+
+openrouter-keys-untrack-message = Minibar forgets this key. It keeps working on OpenRouter.
+
+
+openrouter-keys-tracked-here = Minibar tracks this key.
+
+
+openrouter-keys-manage-hint = Add a management key in Settings to create, edit and delete keys.
+
 # src/settings_window/notifications.rs
 notification-sounds = Notification sounds
 
@@ -2687,3 +2723,208 @@ muse-session-missing = Connect your signed-in Muse account from Chrome to read w
 muse-remove-session = Remove Muse session
 muse-remove-session-help = Minibar will forget the saved session credential. Your Chrome sign-in stays unchanged.
 muse-session-removed = Muse session removed
+# src/whats_new.rs
+no-summary-for-this-version = There's no summary for this version yet. The full release notes are on GitHub.
+
+# src/whats_new.rs
+couldn-t-load-what-s-new = Couldn't load what's new. Check your connection, or read the release notes on GitHub.
+
+# src/whats_new.rs
+full-release-notes = Full release notes
+
+# src/settings_window/about.rs
+show-what-s-new-after-updating = Show what's new after updating
+
+# src/settings_window/about.rs
+a-short-summary-of-the-release-once-it-s-installed = A short summary of the release, once it's installed.
+
+# src/settings_window/about.rs
+view = View
+
+# src/settings_window/general.rs
+popup-shortcut = Popup shortcut
+popup-shortcut-description = Press it anywhere in Windows to show or hide the popup.
+shortcut-not-set = Not set
+press-a-shortcut = Press a shortcut…
+popup-shortcut-recording-hint = Esc cancels. Backspace removes the shortcut.
+popup-shortcut-needs-modifier = Include Ctrl, Alt or Win, or use F13–F24.
+popup-shortcut-in-use = Another app already uses this shortcut. Choose a different one.
+clear-shortcut = Remove shortcut
+taskbar = Taskbar
+preview = Preview
+taskbar-page-caption = Live usage widgets drawn inside the Windows taskbar, next to the clock. They follow the taskbar's theme; click one to open the popup on its provider.
+taskbar-show-widgets = Show widgets on the taskbar
+taskbar-show-widgets-description = Draws the widgets below inside the Windows taskbar.
+taskbar-position = Position
+taskbar-position-description = Where the widgets sit on the taskbar. The start suits centered taskbar icons best.
+taskbar-position-tray = Next to the notification area
+taskbar-position-start = At the start of the taskbar
+taskbar-widgets = Widgets
+taskbar-no-widgets = No widgets yet
+taskbar-no-widgets-description = Add a widget to show a quota on the taskbar.
+taskbar-show-provider-icon = Show the provider icon
+taskbar-style-glance = Glance
+taskbar-style-glance-hint = The provider icon beside two lines of text, like the weather button.
+taskbar-style-rings-hint = A progress ring per quota with its value beside it.
+taskbar-style-bars-hint = Thin progress bars stacked beside the provider icon.
+taskbar-menu-open = Open Codex Minibar
+taskbar-menu-settings = Taskbar widget settings
+taskbar-menu-hide = Hide taskbar widgets
+taskbar-card-left = { $value } left
+taskbar-card-used = { $value } used
+taskbar-card-resets = Resets in { $time } · { $clock }
+taskbar-card-no-data = Waiting for data
+short-5h = 5h
+short-7d = 7d
+taskbar-style-nested = Nested rings
+taskbar-style-dials = Dials
+taskbar-style-meters = Meters
+taskbar-style-nested-hint = Concentric rings in the space of one, with values beside them if you like.
+taskbar-style-dials-hint = A small ring per quota with the number inside it.
+taskbar-style-meters-hint = Slim level columns, like a battery gauge.
+taskbar-show-provider-icon-description = The provider's mark at the start of the widget.
+taskbar-show-labels = Show labels
+taskbar-show-labels-description = Short names like 5h and 7d next to the values.
+taskbar-show-values = Show percentages
+taskbar-show-values-description = The quota percentages on the widget.
+taskbar-show-pace = Show pace
+taskbar-show-pace-description = A mark where usage would be right now at an even burn.
+taskbar-menu-edit = Edit this widget
+taskbar-content = Content
+taskbar-content-hint = What the widget writes next to its graphic.
+taskbar-reset-time = Reset time
+taskbar-reset-time-description = When each quota resets.
+taskbar-reset-off = Off
+taskbar-reset-countdown = Time left
+taskbar-reset-clock = Clock time
+taskbar-cycle = Cycle widgets with the scroll wheel
+taskbar-cycle-description = Shows one widget at a time; scroll over it to switch to the next.
+taskbar-card-tokens = { $count } tokens
+taskbar-click = Click opens
+taskbar-click-description = The popup page a click on a widget opens.
+taskbar-click-nearest = Home, or the tab if not on Home
+taskbar-click-tab = Provider tab
+taskbar-click-home = Home
+
+# src/settings_window/notifications.rs
+follow-do-not-disturb = Pause during Do Not Disturb
+
+# src/settings_window/notifications.rs
+follow-do-not-disturb-description = While Windows Do Not Disturb or Focus is on, notifications are skipped and sounds stay off. Results of actions you start still show.
+
+# src/settings_window/advanced.rs
+performance = Performance
+
+# src/settings_window/advanced.rs
+game-mode = Game mode
+
+# src/settings_window/advanced.rs
+game-mode-description = Checks limits and usage less often, runs at low priority and pauses notifications. Automatic turns it on while a game runs, from the moment it is in front until it closes.
+
+# src/settings.rs
+game-mode-off = Off
+
+# src/settings.rs
+game-mode-automatic = Automatic
+
+# src/settings.rs
+game-mode-always = Always on
+
+# src/settings_window/notifications.rs
+notify-game-mode-changes = Game mode changes
+
+# src/settings_window/notifications.rs
+notify-game-mode-changes-description = Shows when game mode turns on or off
+
+# src/notifications.rs
+game-mode-on-title = Game mode on
+
+# src/notifications.rs
+game-mode-on-body = Checking limits less often and pausing notifications
+
+# src/notifications.rs
+game-mode-on-game-body = { $game } is running. Checking limits less often and pausing notifications
+
+# src/notifications.rs
+not-a-game = Not a game
+
+# src/settings_window/advanced.rs
+add-a-game = Add a game
+
+# src/settings_window/advanced.rs
+add-a-game-description = Games known to Windows Game Bar and games from Steam, Epic, GOG and Xbox are detected on their own. Add any other program here.
+
+# src/settings_window/advanced.rs
+never-a-game-path = Never a game · { $path }
+
+# src/notifications.rs
+game-mode-off-title = Game mode off
+
+# src/notifications.rs
+game-mode-off-body = Back to normal checks and notifications
+
+# src/settings_window/command_palette.rs
+command-palette = Command Palette
+
+# src/settings_window/command_palette.rs
+stream-deck = Stream Deck
+
+# src/settings_window/command_palette.rs
+install = Install
+
+# src/settings_window/command_palette.rs
+cmdpal-extension = Command Palette extension
+
+# src/settings_window/command_palette.rs
+cmdpal-description = Adds Minibar to PowerToys Command Palette: type a provider to see its limits, or pin bands to the Dock. Installing asks for administrator approval.
+
+# src/settings_window/command_palette.rs
+cmdpal-installed-hint = Installed. Type “minibar” or a provider name in Command Palette, or pin bands from Edit Dock.
+
+# src/settings_window/command_palette.rs
+cmdpal-downloading = Downloading the extension…
+
+# src/settings_window/command_palette.rs
+cmdpal-installing = Waiting for the installer. Approve the administrator prompt to continue.
+
+# src/settings_window/command_palette.rs
+cmdpal-installing-short = Installing…
+
+# src/settings_window/command_palette.rs
+cmdpal-removing = Removing the extension…
+
+# src/settings_window/command_palette.rs
+cmdpal-failed = The extension could not be installed or removed.
+
+# src/settings_window/command_palette.rs
+cmdpal-reinstall = Reinstall
+
+# src/settings_window/command_palette.rs
+cmdpal-dock-bands = Dock bands
+
+# src/settings_window/command_palette.rs
+cmdpal-dock-bands-caption = Each band appears in the Command Palette Dock settings. Pin it from Edit Dock, then choose where it sits.
+
+# src/settings_window/command_palette.rs
+cmdpal-no-bands = No bands
+
+# src/settings_window/command_palette.rs
+cmdpal-no-bands-description = Add a band to pin provider limits to the Dock.
+
+# src/settings_window/command_palette.rs
+cmdpal-add-band = Add band
+
+# src/settings_window/command_palette.rs
+cmdpal-band = Band { $v0 }
+
+# src/settings_window/command_palette.rs
+cmdpal-band-removed = Band removed
+
+# src/settings_window/command_palette.rs
+cmdpal-remove-band = Remove band
+
+# src/settings_window/command_palette.rs
+cmdpal-content-hint = The Dock writes a band as a title over a subtitle.
+
+# src/settings_window/command_palette.rs
+cmdpal-indicators-hint = Up to 2 quotas: one fills the title and subtitle, two take a line each.

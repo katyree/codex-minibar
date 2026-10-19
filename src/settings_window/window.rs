@@ -63,7 +63,7 @@ pub(crate) struct SettingsWindow {
     pub(super) font_families: Vec<SharedString>,
     pub(super) font_picker: super::appearance::FontPicker,
     backdrop: super::backdrop::Backdrop,
-    focus: FocusHandle,
+    pub(super) focus: FocusHandle,
     // Navigation.
     pub(super) mode: NavMode,
     /// Direction of the pending sidebar swap (+1 into Providers, -1 back);
@@ -100,10 +100,22 @@ pub(crate) struct SettingsWindow {
     pub(super) troubleshoot: Option<crate::troubleshoot::ToolPickerState>,
     pub(super) tray_dialog: Option<super::tray::TrayDialog>,
     pub(super) removed_widget: Option<(usize, TrayWidget)>,
+    pub(super) taskbar_dialog: Option<super::tray::TrayDialog>,
+    pub(super) removed_taskbar_widget: Option<(usize, crate::settings::TaskbarWidget)>,
+    pub(super) dock_dialog: Option<super::tray::TrayDialog>,
+    pub(super) removed_dock_widget: Option<(usize, crate::settings::TaskbarWidget)>,
+    pub(super) cmdpal_phase: crate::cmdpal::InstallPhase,
+    /// Whether the Command Palette extension package is registered.
+    pub(super) cmdpal_installed: bool,
     pub(super) confirm_reset: bool,
+    /// The popup shortcut button is waiting for a key combination.
+    pub(super) hotkey_recording: bool,
+    /// The last combination pressed while recording had no modifier.
+    pub(super) hotkey_rejected: bool,
     /// Dialogs that are open or still playing their exit transition.
     pub(super) overlays: Overlays,
     pub(super) tray_previews: super::tray::PreviewCache,
+    pub(super) taskbar_previews: super::taskbar::PreviewCache,
     pub(super) theme_browser: super::vscode_themes::ThemeBrowser,
     _poll: Task<()>,
     _subscriptions: Vec<Subscription>,
@@ -142,8 +154,10 @@ impl SettingsWindow {
             super::vscode_themes::end_theme_preview(cx);
             super::appearance::end_font_preview(cx);
             super::window_closed(false);
+            crate::hotkey::set_suspended(false);
             true
         });
+        crate::hotkey::set_suspended(false);
         let focus = cx.focus_handle();
         window.focus(&focus);
         let updates = Arc::clone(&state.updates);
@@ -215,9 +229,18 @@ impl SettingsWindow {
             troubleshoot: None,
             tray_dialog: None,
             removed_widget: None,
+            taskbar_dialog: None,
+            removed_taskbar_widget: None,
+            dock_dialog: None,
+            removed_dock_widget: None,
+            cmdpal_phase: crate::cmdpal::InstallPhase::Idle,
+            cmdpal_installed: crate::cmdpal::is_installed(),
             confirm_reset: false,
+            hotkey_recording: false,
+            hotkey_rejected: false,
             overlays: Overlays::default(),
             tray_previews: Default::default(),
+            taskbar_previews: Default::default(),
             theme_browser: Default::default(),
             _poll: poll,
             _subscriptions: subscriptions,
@@ -247,6 +270,8 @@ impl SettingsWindow {
         self.settings.language.apply();
         cx.refresh_windows();
         self.settings.normalize_tray_widgets();
+        self.settings.taskbar.normalize();
+        self.settings.command_palette.normalize();
         self.settings.normalize_popup_visibility();
         persistence::queue(self.state.settings_tx.clone(), move |settings| {
             edit(settings)
@@ -388,6 +413,7 @@ impl SettingsWindow {
             return;
         }
         self.page = page;
+        self.stop_hotkey_recording();
         // A theme preview belongs to the Appearance page it was started on.
         super::vscode_themes::end_theme_preview(cx);
         self.font_picker.cancel_preview();
@@ -397,6 +423,12 @@ impl SettingsWindow {
         self.scroll_glide = None;
         self.kit.menus.close_silently();
         cx.notify();
+    }
+
+    /// Shows a root tab, leaving the Providers drill-in if it is open.
+    pub(super) fn open_tab(&mut self, tab: Tab, cx: &mut Context<Self>) {
+        self.set_mode(NavMode::Root);
+        self.select_tab(tab, cx);
     }
 
     fn select_tab(&mut self, tab: Tab, cx: &mut Context<Self>) {
@@ -528,6 +560,10 @@ impl SettingsWindow {
     // ----- keyboard ------------------------------------------------------------
 
     fn on_key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.record_hotkey(event, cx) {
+            cx.stop_propagation();
+            return;
+        }
         if event.keystroke.key != "escape" {
             return;
         }
@@ -539,6 +575,10 @@ impl SettingsWindow {
             self.troubleshoot = None;
         } else if self.tray_dialog.is_some() {
             self.tray_dialog = None;
+        } else if self.taskbar_dialog.is_some() {
+            self.taskbar_dialog = None;
+        } else if self.dock_dialog.is_some() {
+            self.dock_dialog = None;
         } else if self.close_open_vsx(cx) {
         } else if self.confirm_reset {
             self.confirm_reset = false;
@@ -1137,6 +1177,7 @@ impl SettingsWindow {
                         self.activation_page(k, cx),
                     ),
                     Tab::Tray => (crate::i18n::tr("tray"), self.tray_page(k, window, cx)),
+                    Tab::Taskbar => (crate::i18n::tr("taskbar"), self.taskbar_page(k, window, cx)),
                     Tab::Notifications => (
                         crate::i18n::tr("notifications"),
                         self.notifications_page(k, cx),
@@ -1331,6 +1372,12 @@ impl Render for SettingsWindow {
         if let Some(overlay) = self.tray_dialog_overlay(&mut k, window, cx) {
             overlays.push(overlay);
         }
+        if let Some(overlay) = self.taskbar_dialog_overlay(&mut k, window, cx) {
+            overlays.push(overlay);
+        }
+        if let Some(overlay) = self.dock_dialog_overlay(&mut k, window, cx) {
+            overlays.push(overlay);
+        }
         if let Some(overlay) = self.reset_confirm_overlay(&mut k, cx) {
             overlays.push(overlay);
         }
@@ -1391,6 +1438,16 @@ pub(super) struct Overlays {
     pub(super) provider: kit::Presence<ProviderDialog>,
     pub(super) troubleshoot: kit::Presence<crate::troubleshoot::ToolPickerState>,
     pub(super) tray: kit::Presence<(super::tray::TrayDialog, usize, TrayWidget)>,
+    pub(super) taskbar: kit::Presence<(
+        super::tray::TrayDialog,
+        usize,
+        crate::settings::TaskbarWidget,
+    )>,
+    pub(super) dock: kit::Presence<(
+        super::tray::TrayDialog,
+        usize,
+        crate::settings::TaskbarWidget,
+    )>,
     pub(super) reset: kit::Presence<()>,
     pub(super) open_vsx: kit::Presence<()>,
 }

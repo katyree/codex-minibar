@@ -13,3 +13,9 @@
 /streamdeck/com.vertopolkalf.codex-minibar.sdPlugin/bin/plugin.js
 /streamdeck/com.vertopolkalf.codex-minibar.sdPlugin/bin/*.js.map
 /streamdeck/**/logs/
+
+# Command Palette extension build artifacts
+/cmdpal/**/bin/
+/cmdpal/**/obj/
+/cmdpal/dist/
+/cmdpal/**/AppPackages/

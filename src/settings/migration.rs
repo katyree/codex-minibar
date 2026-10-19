@@ -306,7 +306,8 @@ fn instances_from_legacy(legacy: &LegacyV38) -> Migrated {
             ProviderKind::OpenCodeZen
             | ProviderKind::OpenCodeGo
             | ProviderKind::Junie
-            | ProviderKind::Muse => instances.push(base),
+            | ProviderKind::Muse
+            | ProviderKind::CommandCode => instances.push(base),
         }
     }
 

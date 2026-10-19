@@ -5,6 +5,7 @@
 //! through [`super::PopupCommand`].
 
 mod activity;
+pub(crate) use activity::is_cost_provider;
 pub(crate) mod assets;
 mod cards;
 pub(crate) mod components;
@@ -22,6 +23,7 @@ mod blur_effect;
 mod root;
 pub(crate) mod theme;
 mod toast;
+mod toast_summary;
 mod tooltip;
 mod usage;
 #[cfg(windows)]
@@ -89,10 +91,74 @@ pub(crate) fn animations_enabled(ui: &UiState) -> bool {
     ui.animations_enabled && crate::popup::system_animations_enabled()
 }
 
-/// The fixed technical host: anchored to the monitor's right edge, standing
-/// on the work area's bottom margin, wide and tall enough for every layout.
+/// Which corner of the work area the popup stands in.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Placement {
+    pub(crate) left: bool,
+    pub(crate) top: bool,
+}
+
 #[cfg(windows)]
-pub(crate) fn host_rect(monitor: Monitor) -> win32::Rect {
+impl Placement {
+    /// The corner by the taskbar: the tray's end by default, or the end
+    /// nearest `anchor` when the popup opens `beside` a taskbar widget.
+    pub(crate) fn for_anchor(monitor: Monitor, anchor: (i32, i32), beside: bool) -> Self {
+        let bounds = monitor.bounds;
+        let edge = taskbar_edge(monitor);
+        let vertical = matches!(edge, Edge::Left | Edge::Right);
+        let center_x = bounds.left + bounds.width() / 2;
+        let center_y = bounds.top + bounds.height() / 2;
+        Self {
+            left: edge == Edge::Left || (edge != Edge::Right && beside && anchor.0 < center_x),
+            top: edge == Edge::Top || (vertical && beside && anchor.1 < center_y),
+        }
+    }
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Edge {
+    Left,
+    Top,
+    Right,
+    Bottom,
+}
+
+/// The monitor edge the taskbar is docked to. Its own frame decides, because
+/// third-party appbars shrink the work area too; the work-area insets are only
+/// a fallback when no taskbar lives on this monitor.
+#[cfg(windows)]
+fn taskbar_edge(monitor: Monitor) -> Edge {
+    let (bounds, work) = (monitor.bounds, monitor.work);
+    if let Some(bar) = monitor.taskbar {
+        return if bar.height() > bar.width() {
+            if bar.left + bar.right < bounds.left + bounds.right {
+                Edge::Left
+            } else {
+                Edge::Right
+            }
+        } else if bar.top + bar.bottom < bounds.top + bounds.bottom {
+            Edge::Top
+        } else {
+            Edge::Bottom
+        };
+    }
+    if work.left > bounds.left {
+        Edge::Left
+    } else if work.right < bounds.right {
+        Edge::Right
+    } else if work.top > bounds.top {
+        Edge::Top
+    } else {
+        Edge::Bottom
+    }
+}
+
+/// The fixed technical host: anchored to the work area's edge on the
+/// placement's side, standing on its bottom (or top) margin, wide and tall
+/// enough for every layout.
+#[cfg(windows)]
+pub(crate) fn host_rect(monitor: Monitor, placement: Placement) -> win32::Rect {
     let scale = monitor.scale();
     let margin = crate::popup::EDGE_MARGIN_PX;
     let wide = f64::from(monitor.bounds.width() - margin * 2) / scale
@@ -105,11 +171,23 @@ pub(crate) fn host_rect(monitor: Monitor) -> win32::Rect {
     let width = (f64::from(width_dip) * scale).round() as i32 + margin;
     let height = (f64::from(monitor.bounds.height()) * crate::popup::POPUP_SCREEN_HEIGHT_FRACTION)
         .round() as i32;
-    let bottom = monitor.work.bottom - margin;
+    let work = monitor.work;
+    let (left, right) = if placement.left {
+        (work.left, work.left + width)
+    } else {
+        (work.right - width, work.right)
+    };
+    let (top, bottom) = if placement.top {
+        let top = work.top + margin;
+        (top, (top + height).min(work.bottom))
+    } else {
+        let bottom = work.bottom - margin;
+        ((bottom - height).max(work.top), bottom)
+    };
     win32::Rect {
-        left: monitor.bounds.right - width,
-        top: (bottom - height).max(monitor.work.top),
-        right: monitor.bounds.right,
+        left,
+        top,
+        right,
         bottom,
     }
 }
@@ -209,11 +287,13 @@ fn handle_command(
         PopupCommand::Publish(ui) => {
             let _ = window.update(cx, |root, window, cx| root.apply_ui(*ui, window, cx));
         }
-        PopupCommand::Show { anchor } => {
+        PopupCommand::Show { anchor, beside } => {
             #[cfg(windows)]
             {
                 let plan = window
-                    .update(cx, |root, window, cx| root.begin_show(anchor, window, cx))
+                    .update(cx, |root, window, cx| {
+                        root.begin_show(anchor, beside, window, cx)
+                    })
                     .ok()
                     .flatten();
                 let Some(plan) = plan else {
@@ -245,7 +325,7 @@ fn handle_command(
             }
             #[cfg(not(windows))]
             {
-                let _ = anchor;
+                let _ = (anchor, beside);
             }
         }
         PopupCommand::Hide => {
@@ -253,6 +333,13 @@ fn handle_command(
         }
         PopupCommand::SelectView(view) => {
             let _ = window.update(cx, |root, _, cx| root.select_view(view, cx));
+        }
+        PopupCommand::SelectNearest(provider) => {
+            let _ = window.update(cx, |root, _, cx| {
+                if let Some(view) = root.nearest_view(provider, cx) {
+                    root.select_view(view, cx);
+                }
+            });
         }
         PopupCommand::StartHomeEditing => {
             let _ = window.update(cx, |root, _, cx| root.set_home_editing(true, cx));
@@ -289,7 +376,7 @@ fn handle_command(
                         let monitor = win32::monitor_for_point(rect.right - 1, rect.bottom - 1);
                         root.host.monitor = Some(monitor);
                         root.host.scale = monitor.scale() as f32;
-                        Some((hwnd, host_rect(monitor)))
+                        Some((hwnd, host_rect(monitor, root.host.placement)))
                     })
                     .ok()
                     .flatten();
@@ -352,4 +439,96 @@ fn root_animations(window: &gpui::WindowHandle<PopupRoot>, cx: &mut gpui::AsyncA
     window
         .update(cx, |root, _, _| animations_enabled(&root.ui))
         .unwrap_or(false)
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::{Monitor, Placement, win32::Rect};
+
+    fn monitor(work: Rect) -> Monitor {
+        Monitor {
+            bounds: Rect {
+                left: 0,
+                top: 0,
+                right: 1920,
+                bottom: 1080,
+            },
+            work,
+            taskbar: None,
+            dpi: 96,
+        }
+    }
+
+    fn rect(left: i32, top: i32, right: i32, bottom: i32) -> Rect {
+        Rect {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    #[test]
+    fn popup_opens_by_the_taskbar_and_beside_start_widgets() {
+        let bottom = monitor(rect(0, 0, 1920, 1032));
+        let tray = Placement::default();
+        assert_eq!(Placement::for_anchor(bottom, (1800, 1050), false), tray);
+        // A tray click never moves the popup, wherever the anchor is.
+        assert_eq!(Placement::for_anchor(bottom, (100, 1050), false), tray);
+        let left = Placement {
+            left: true,
+            top: false,
+        };
+        assert_eq!(Placement::for_anchor(bottom, (100, 1050), true), left);
+        assert_eq!(Placement::for_anchor(bottom, (1500, 1050), true), tray);
+
+        let top = monitor(rect(0, 48, 1920, 1080));
+        assert_eq!(
+            Placement::for_anchor(top, (100, 20), true),
+            Placement {
+                left: true,
+                top: true,
+            }
+        );
+        let side = monitor(rect(62, 0, 1920, 1080));
+        assert_eq!(Placement::for_anchor(side, (30, 1000), false), left);
+        assert_eq!(
+            Placement::for_anchor(side, (30, 100), true),
+            Placement {
+                left: true,
+                top: true,
+            }
+        );
+    }
+
+    #[test]
+    fn other_appbars_do_not_move_the_popup_off_the_taskbar() {
+        let tray = Placement::default();
+        // A top dock plus the bottom taskbar.
+        let mut docked = monitor(rect(0, 40, 1920, 1032));
+        docked.taskbar = Some(rect(0, 1032, 1920, 1080));
+        assert_eq!(Placement::for_anchor(docked, (1800, 1050), false), tray);
+        // A left dock plus the bottom taskbar.
+        docked.work = rect(100, 0, 1920, 1032);
+        assert_eq!(Placement::for_anchor(docked, (1800, 1050), false), tray);
+        // A right dock plus the bottom taskbar, beside a Start-side widget.
+        docked.work = rect(0, 0, 1820, 1032);
+        assert_eq!(
+            Placement::for_anchor(docked, (100, 1050), true),
+            Placement {
+                left: true,
+                top: false,
+            }
+        );
+        // A bottom dock plus a top taskbar.
+        docked.work = rect(0, 48, 1920, 1000);
+        docked.taskbar = Some(rect(0, 0, 1920, 48));
+        assert_eq!(
+            Placement::for_anchor(docked, (1800, 20), false),
+            Placement {
+                left: false,
+                top: true,
+            }
+        );
+    }
 }

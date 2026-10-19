@@ -1728,6 +1728,14 @@ found-an-official-grok-cli-sign-in-on-this-pc = { "" }
 not-found-run-grok-login-before-enabling-it = { "" }
 
 # English source:
+# found-an-official-command-code-cli-sign-in-on-this-pc = Found an official Command Code CLI sign-in on this PC.
+found-an-official-command-code-cli-sign-in-on-this-pc = { "" }
+
+# English source:
+# not-found-run-cmdc-login-before-enabling-it = Not found. Run cmdc login before enabling it.
+not-found-run-cmdc-login-before-enabling-it = { "" }
+
+# English source:
 # found-kiro-ide-kiro-crew-or-a-signed-in-kiro-cli = Found Kiro IDE, Kiro Crew, or a signed-in Kiro CLI.
 found-kiro-ide-kiro-crew-or-a-signed-in-kiro-cli = { "" }
 
@@ -2568,6 +2576,10 @@ cursor-app-folder = { "" }
 grok-cli-folder = { "" }
 
 # English source:
+# command-code-cli-folder = Command Code CLI folder
+command-code-cli-folder = { "" }
+
+# English source:
 # kiro-ide-folder = Kiro IDE folder
 kiro-ide-folder = { "" }
 
@@ -2612,6 +2624,10 @@ reads-subscription-quota-from-your-existing-official-agy-windows = { "" }
 reads-supergrok-subscription-credits-from-your-existing-official = { "" }
 
 # English source:
+# reads-command-code-5h-weekly-and-monthly-credits-from-your-existin = Reads Command Code 5-hour, weekly, and monthly credits from your existing official CLI sign-in.
+reads-command-code-5h-weekly-and-monthly-credits-from-your-existin = { "" }
+
+# English source:
 # fetches-kiro-s-live-monthly-credits-with-its-shared-sign-in-recog = Fetches Kiro's live monthly credits with its shared sign-in; recognizes IDE, Crew, and CLI installs.
 fetches-kiro-s-live-monthly-credits-with-its-shared-sign-in-recog = { "" }
 
@@ -2642,6 +2658,10 @@ antigravity-app = { "" }
 # English source:
 # grok-cli = Grok CLI
 grok-cli = { "" }
+
+# English source:
+# command-code-cli = Command Code CLI
+command-code-cli = { "" }
 
 # English source:
 # kiro-ide = Kiro IDE
@@ -3067,6 +3087,10 @@ folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut = { "" }
 folder-with-grok-exe-grok-cmd-or-grok-ps1-leave-empty-to-find-it = { "" }
 
 # English source:
+# folder-with-cmdc-cmd-or-cmdc-ps1-leave-empty-to-find-it-automati = Folder with cmdc.cmd or cmdc.ps1. Leave empty to find it automatically.
+folder-with-cmdc-cmd-or-cmdc-ps1-leave-empty-to-find-it-automati = { "" }
+
+# English source:
 # folder-containing-kiro-exe-or-the-executable-itself-leave-empty-t = Folder containing Kiro.exe, or the executable itself. Leave empty to find it automatically.
 folder-containing-kiro-exe-or-the-executable-itself-leave-empty-t = { "" }
 
@@ -3441,7 +3465,7 @@ openrouter-keys-delete = { "" }
 
 
 # English source:
-# openrouter-keys-delete-tracked = This app uses this key. Remove it in Settings first.
+# openrouter-keys-delete-tracked = Minibar also stops tracking it.
 openrouter-keys-delete-tracked = { "" }
 
 
@@ -3623,6 +3647,30 @@ openrouter-keys-not-a-management-key = { "" }
 # English source:
 # openrouter-keys-key-not-found = This key no longer exists.
 openrouter-keys-key-not-found = { "" }
+
+# English source:
+# openrouter-keys-untrack = Remove from app
+openrouter-keys-untrack = { "" }
+
+# English source:
+# openrouter-keys-untracking = Removing…
+openrouter-keys-untracking = { "" }
+
+# English source:
+# openrouter-keys-untrack-title = Stop tracking “{ $name }”?
+openrouter-keys-untrack-title = { "" }
+
+# English source:
+# openrouter-keys-untrack-message = Minibar forgets this key. It keeps working on OpenRouter.
+openrouter-keys-untrack-message = { "" }
+
+# English source:
+# openrouter-keys-tracked-here = Minibar tracks this key.
+openrouter-keys-tracked-here = { "" }
+
+# English source:
+# openrouter-keys-manage-hint = Add a management key in Settings to create, edit and delete keys.
+openrouter-keys-manage-hint = { "" }
 
 # English source:
 # notification-sounds = Notification sounds
@@ -3813,3 +3861,444 @@ muse-session-missing = Connect your signed-in Muse account from Chrome to read w
 muse-remove-session = Remove Muse session
 muse-remove-session-help = Minibar will forget the saved session credential. Your Chrome sign-in stays unchanged.
 muse-session-removed = Muse session removed
+# English source:
+# no-summary-for-this-version = There's no summary for this version yet. The full release notes are on GitHub.
+no-summary-for-this-version = { "" }
+
+# English source:
+# couldn-t-load-what-s-new = Couldn't load what's new. Check your connection, or read the release notes on GitHub.
+couldn-t-load-what-s-new = { "" }
+
+# English source:
+# full-release-notes = Full release notes
+full-release-notes = { "" }
+
+# English source:
+# show-what-s-new-after-updating = Show what's new after updating
+show-what-s-new-after-updating = { "" }
+
+# English source:
+# a-short-summary-of-the-release-once-it-s-installed = A short summary of the release, once it's installed.
+a-short-summary-of-the-release-once-it-s-installed = { "" }
+
+# English source:
+# view = View
+view = { "" }
+
+# popup-shortcut = Popup shortcut
+popup-shortcut = { "" }
+
+# English source:
+# popup-shortcut-description = Press it anywhere in Windows to show or hide the popup.
+popup-shortcut-description = { "" }
+
+# English source:
+# shortcut-not-set = Not set
+shortcut-not-set = { "" }
+
+# English source:
+# press-a-shortcut = Press a shortcut…
+press-a-shortcut = { "" }
+
+# English source:
+# popup-shortcut-recording-hint = Esc cancels. Backspace removes the shortcut.
+popup-shortcut-recording-hint = { "" }
+
+# English source:
+# popup-shortcut-needs-modifier = Include Ctrl, Alt or Win, or use F13–F24.
+popup-shortcut-needs-modifier = { "" }
+
+# English source:
+# popup-shortcut-in-use = Another app already uses this shortcut. Choose a different one.
+popup-shortcut-in-use = { "" }
+
+# English source:
+# clear-shortcut = Remove shortcut
+clear-shortcut = { "" }
+
+# English source:
+# taskbar = Taskbar
+taskbar = { "" }
+
+# English source:
+# preview = Preview
+preview = { "" }
+
+# English source:
+# taskbar-page-caption = Live usage widgets drawn inside the Windows taskbar, next to the clock. They follow the taskbar's theme; click one to open the popup on its provider.
+taskbar-page-caption = { "" }
+
+# English source:
+# taskbar-show-widgets = Show widgets on the taskbar
+taskbar-show-widgets = { "" }
+
+# English source:
+# taskbar-show-widgets-description = Draws the widgets below inside the Windows taskbar.
+taskbar-show-widgets-description = { "" }
+
+# English source:
+# taskbar-position = Position
+taskbar-position = { "" }
+
+# English source:
+# taskbar-position-description = Where the widgets sit on the taskbar. The start suits centered taskbar icons best.
+taskbar-position-description = { "" }
+
+# English source:
+# taskbar-position-tray = Next to the notification area
+taskbar-position-tray = { "" }
+
+# English source:
+# taskbar-position-start = At the start of the taskbar
+taskbar-position-start = { "" }
+
+# English source:
+# taskbar-widgets = Widgets
+taskbar-widgets = { "" }
+
+# English source:
+# taskbar-no-widgets = No widgets yet
+taskbar-no-widgets = { "" }
+
+# English source:
+# taskbar-no-widgets-description = Add a widget to show a quota on the taskbar.
+taskbar-no-widgets-description = { "" }
+
+# English source:
+# taskbar-show-provider-icon = Show the provider icon
+taskbar-show-provider-icon = { "" }
+
+# English source:
+# taskbar-style-glance = Glance
+taskbar-style-glance = { "" }
+
+
+# English source:
+# taskbar-style-glance-hint = The provider icon beside two lines of text, like the weather button.
+taskbar-style-glance-hint = { "" }
+
+# English source:
+# taskbar-style-rings-hint = A progress ring per quota with its value beside it.
+taskbar-style-rings-hint = { "" }
+
+# English source:
+# taskbar-style-bars-hint = Thin progress bars stacked beside the provider icon.
+taskbar-style-bars-hint = { "" }
+
+
+# English source:
+# taskbar-menu-open = Open Codex Minibar
+taskbar-menu-open = { "" }
+
+# English source:
+# taskbar-menu-settings = Taskbar widget settings
+taskbar-menu-settings = { "" }
+
+# English source:
+# taskbar-menu-hide = Hide taskbar widgets
+taskbar-menu-hide = { "" }
+
+# English source:
+# taskbar-card-left = { $value } left
+taskbar-card-left = { "" }
+
+# English source:
+# taskbar-card-used = { $value } used
+taskbar-card-used = { "" }
+
+# English source:
+# taskbar-card-resets = Resets in { $time } · { $clock }
+taskbar-card-resets = { "" }
+
+# English source:
+# taskbar-card-no-data = Waiting for data
+taskbar-card-no-data = { "" }
+
+
+# English source:
+# short-5h = 5h
+short-5h = { "" }
+
+# English source:
+# short-7d = 7d
+short-7d = { "" }
+
+# English source:
+# taskbar-style-nested = Nested rings
+taskbar-style-nested = { "" }
+
+# English source:
+# taskbar-style-dials = Dials
+taskbar-style-dials = { "" }
+
+# English source:
+# taskbar-style-meters = Meters
+taskbar-style-meters = { "" }
+
+# English source:
+# taskbar-style-nested-hint = Concentric rings in the space of one, with values beside them if you like.
+taskbar-style-nested-hint = { "" }
+
+# English source:
+# taskbar-style-dials-hint = A small ring per quota with the number inside it.
+taskbar-style-dials-hint = { "" }
+
+# English source:
+# taskbar-style-meters-hint = Slim level columns, like a battery gauge.
+taskbar-style-meters-hint = { "" }
+
+# English source:
+# taskbar-show-provider-icon-description = The provider's mark at the start of the widget.
+taskbar-show-provider-icon-description = { "" }
+
+# English source:
+# taskbar-show-labels = Show labels
+taskbar-show-labels = { "" }
+
+# English source:
+# taskbar-show-labels-description = Short names like 5h and 7d next to the values.
+taskbar-show-labels-description = { "" }
+
+# English source:
+# taskbar-show-values = Show percentages
+taskbar-show-values = { "" }
+
+# English source:
+# taskbar-show-values-description = The quota percentages on the widget.
+taskbar-show-values-description = { "" }
+
+# English source:
+# taskbar-show-pace = Show pace
+taskbar-show-pace = { "" }
+
+# English source:
+# taskbar-show-pace-description = A mark where usage would be right now at an even burn.
+taskbar-show-pace-description = { "" }
+
+# English source:
+# taskbar-menu-edit = Edit this widget
+taskbar-menu-edit = { "" }
+
+# English source:
+# taskbar-content = Content
+taskbar-content = { "" }
+
+# English source:
+# taskbar-content-hint = What the widget writes next to its graphic.
+taskbar-content-hint = { "" }
+
+# English source:
+# taskbar-reset-time = Reset time
+taskbar-reset-time = { "" }
+
+# English source:
+# taskbar-reset-time-description = When each quota resets.
+taskbar-reset-time-description = { "" }
+
+# English source:
+# taskbar-reset-off = Off
+taskbar-reset-off = { "" }
+
+# English source:
+# taskbar-reset-countdown = Time left
+taskbar-reset-countdown = { "" }
+
+# English source:
+# taskbar-reset-clock = Clock time
+taskbar-reset-clock = { "" }
+
+# English source:
+# taskbar-cycle = Cycle widgets with the scroll wheel
+taskbar-cycle = { "" }
+
+# English source:
+# taskbar-cycle-description = Shows one widget at a time; scroll over it to switch to the next.
+taskbar-cycle-description = { "" }
+
+# English source:
+# taskbar-card-tokens = { $count } tokens
+taskbar-card-tokens = { "" }
+
+# English source:
+# taskbar-click = Click opens
+taskbar-click = { "" }
+
+# English source:
+# taskbar-click-description = The popup page a click on a widget opens.
+taskbar-click-description = { "" }
+
+# English source:
+# taskbar-click-nearest = Home, or the tab if not on Home
+taskbar-click-nearest = { "" }
+
+# English source:
+# taskbar-click-tab = Provider tab
+taskbar-click-tab = { "" }
+
+# English source:
+# taskbar-click-home = Home
+taskbar-click-home = { "" }
+
+# English source:
+# follow-do-not-disturb = Pause during Do Not Disturb
+follow-do-not-disturb = { "" }
+
+# English source:
+# follow-do-not-disturb-description = While Windows Do Not Disturb or Focus is on, notifications are skipped and sounds stay off. Results of actions you start still show.
+follow-do-not-disturb-description = { "" }
+
+# English source:
+# performance = Performance
+performance = { "" }
+
+# English source:
+# game-mode = Game mode
+game-mode = { "" }
+
+# English source:
+# game-mode-description = Checks limits and usage less often, runs at low priority and pauses notifications. Automatic turns it on while a game runs, from the moment it is in front until it closes.
+game-mode-description = { "" }
+
+# English source:
+# game-mode-off = Off
+game-mode-off = { "" }
+
+# English source:
+# game-mode-automatic = Automatic
+game-mode-automatic = { "" }
+
+# English source:
+# game-mode-always = Always on
+game-mode-always = { "" }
+
+# English source:
+# notify-game-mode-changes = Game mode changes
+notify-game-mode-changes = { "" }
+
+# English source:
+# notify-game-mode-changes-description = Shows when game mode turns on or off
+notify-game-mode-changes-description = { "" }
+
+# English source:
+# game-mode-on-title = Game mode on
+game-mode-on-title = { "" }
+
+# English source:
+# game-mode-on-body = Checking limits less often and pausing notifications
+game-mode-on-body = { "" }
+
+# English source:
+# game-mode-on-game-body = { $game } is running. Checking limits less often and pausing notifications
+game-mode-on-game-body = { "" }
+
+# English source:
+# not-a-game = Not a game
+not-a-game = { "" }
+
+# English source:
+# add-a-game = Add a game
+add-a-game = { "" }
+
+# English source:
+# add-a-game-description = Games known to Windows Game Bar and games from Steam, Epic, GOG and Xbox are detected on their own. Add any other program here.
+add-a-game-description = { "" }
+
+# English source:
+# never-a-game-path = Never a game · { $path }
+never-a-game-path = { "" }
+
+# English source:
+# game-mode-off-title = Game mode off
+game-mode-off-title = { "" }
+
+# English source:
+# game-mode-off-body = Back to normal checks and notifications
+game-mode-off-body = { "" }
+
+# English source:
+# command-palette = Command Palette
+command-palette = { "" }
+
+# English source:
+# stream-deck = Stream Deck
+stream-deck = { "" }
+
+# English source:
+# install = Install
+install = { "" }
+
+# English source:
+# cmdpal-extension = Command Palette extension
+cmdpal-extension = { "" }
+
+# English source:
+# cmdpal-description = Adds Minibar to PowerToys Command Palette: type a provider to see its limits, or pin bands to the Dock. Installing asks for administrator approval.
+cmdpal-description = { "" }
+
+# English source:
+# cmdpal-installed-hint = Installed. Type “minibar” or a provider name in Command Palette, or pin bands from Edit Dock.
+cmdpal-installed-hint = { "" }
+
+# English source:
+# cmdpal-downloading = Downloading the extension…
+cmdpal-downloading = { "" }
+
+# English source:
+# cmdpal-installing = Waiting for the installer. Approve the administrator prompt to continue.
+cmdpal-installing = { "" }
+
+# English source:
+# cmdpal-installing-short = Installing…
+cmdpal-installing-short = { "" }
+
+# English source:
+# cmdpal-removing = Removing the extension…
+cmdpal-removing = { "" }
+
+# English source:
+# cmdpal-failed = The extension could not be installed or removed.
+cmdpal-failed = { "" }
+
+# English source:
+# cmdpal-reinstall = Reinstall
+cmdpal-reinstall = { "" }
+
+# English source:
+# cmdpal-dock-bands = Dock bands
+cmdpal-dock-bands = { "" }
+
+# English source:
+# cmdpal-dock-bands-caption = Each band appears in the Command Palette Dock settings. Pin it from Edit Dock, then choose where it sits.
+cmdpal-dock-bands-caption = { "" }
+
+# English source:
+# cmdpal-no-bands = No bands
+cmdpal-no-bands = { "" }
+
+# English source:
+# cmdpal-no-bands-description = Add a band to pin provider limits to the Dock.
+cmdpal-no-bands-description = { "" }
+
+# English source:
+# cmdpal-add-band = Add band
+cmdpal-add-band = { "" }
+
+# English source:
+# cmdpal-band = Band { $v0 }
+cmdpal-band = { "" }
+
+# English source:
+# cmdpal-band-removed = Band removed
+cmdpal-band-removed = { "" }
+
+# English source:
+# cmdpal-remove-band = Remove band
+cmdpal-remove-band = { "" }
+
+# English source:
+# cmdpal-content-hint = The Dock writes a band as a title over a subtitle.
+cmdpal-content-hint = { "" }
+
+# English source:
+# cmdpal-indicators-hint = Up to 2 quotas: one fills the title and subtitle, two take a line each.
+cmdpal-indicators-hint = { "" }

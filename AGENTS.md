@@ -2,6 +2,8 @@ Always check docs and examples before doing UI work. LLM doesn't have great know
 
 Always run `cargo check` after changes related to the app to ensure the code is correct. No need to run it after changes related to the website.
 
+Always run `cargo fmt` after changing Rust code, including tests, and before every commit. CI rejects unformatted code (`cargo fmt --package codex-minibar --check`).
+
 Never launch the app itself.
 
 ## Worktree builds

@@ -1,8 +1,11 @@
 //! General: startup, Usage Stats, the reset feed and provider status pages.
 
-use gpui::{AnyElement, Context, IntoElement, ParentElement, Styled, Window, div, px, relative};
+use gpui::{
+    AnyElement, Context, IntoElement, KeyDownEvent, ParentElement, SharedString, Styled, Window,
+    div, px, relative,
+};
 
-use super::kit::{self, Kit, Row};
+use super::kit::{self, Button, Kit, Row};
 use super::window::SettingsWindow;
 use crate::settings::{ProviderKind, ResetAnnouncementRefreshInterval, UsageRefreshInterval};
 
@@ -64,6 +67,8 @@ impl SettingsWindow {
                 }),
             )]
         });
+
+        let shortcut = kit::card_of(k, |k| vec![self.popup_hotkey_row(k, cx)]);
 
         let usage = kit::card_of(k, |k| {
             vec![
@@ -197,6 +202,7 @@ impl SettingsWindow {
         vec![
             language,
             startup,
+            shortcut,
             kit::section_heading(k, crate::i18n::tr("usage-stats")),
             usage,
             kit::section_heading(k, crate::i18n::tr("tibo-resets")),
@@ -204,6 +210,106 @@ impl SettingsWindow {
             kit::section_heading(k, crate::i18n::tr("provider-status")),
             provider_status,
         ]
+    }
+
+    /// Records the popup shortcut: the button waits for the next combination,
+    /// Esc cancels and Backspace or Delete clears it.
+    fn popup_hotkey_row(&self, k: &mut Kit, cx: &mut Context<Self>) -> AnyElement {
+        let recording = self.hotkey_recording;
+        let current = self.settings.popup_hotkey;
+        let label: SharedString = if recording {
+            crate::i18n::tr("press-a-shortcut").into()
+        } else if let Some(hotkey) = current {
+            hotkey.label().into()
+        } else {
+            crate::i18n::tr("shortcut-not-set").into()
+        };
+        let mut button = Button::new("general-popup-hotkey", label).on_click(Self::h(
+            cx,
+            |this, (), window, cx| {
+                if this.hotkey_recording {
+                    this.stop_hotkey_recording();
+                } else {
+                    this.hotkey_recording = true;
+                    this.hotkey_rejected = false;
+                    crate::hotkey::set_suspended(true);
+                    // Text fields would otherwise consume the keystrokes.
+                    window.focus(&this.focus);
+                }
+                cx.notify();
+            },
+        ));
+        if recording {
+            button = button.accent();
+        }
+
+        let mut row = Row::new(
+            "general-popup-hotkey-row",
+            crate::i18n::tr("popup-shortcut"),
+        )
+        .description(k, crate::i18n::tr("popup-shortcut-description"));
+        let detail = if recording && self.hotkey_rejected {
+            Some((
+                crate::i18n::tr("popup-shortcut-needs-modifier"),
+                k.theme.caution,
+            ))
+        } else if recording {
+            Some((
+                crate::i18n::tr("popup-shortcut-recording-hint"),
+                k.theme.text_secondary,
+            ))
+        } else if current.is_some() && crate::hotkey::status() == crate::hotkey::Status::Unavailable
+        {
+            Some((crate::i18n::tr("popup-shortcut-in-use"), k.theme.caution))
+        } else {
+            None
+        };
+        if let Some((text, color)) = detail {
+            row = row.detail(kit::text(text, 12.0, color).into_any_element());
+        }
+        if current.is_some() && !recording {
+            row = row.trailing(
+                Button::icon_only("general-popup-hotkey-clear", "x-circle-fill")
+                    .ghost()
+                    .tooltip(crate::i18n::tr("clear-shortcut"))
+                    .on_click(Self::h(cx, |this, (), _, cx| {
+                        this.edit(cx, |settings| settings.popup_hotkey = None)
+                    }))
+                    .render(k),
+            );
+        }
+        row.trailing(button.render(k)).render(k)
+    }
+
+    pub(super) fn stop_hotkey_recording(&mut self) {
+        self.hotkey_recording = false;
+        self.hotkey_rejected = false;
+        crate::hotkey::set_suspended(false);
+    }
+
+    /// Consumes a key press while the shortcut button is recording.
+    pub(super) fn record_hotkey(&mut self, event: &KeyDownEvent, cx: &mut Context<Self>) -> bool {
+        if !self.hotkey_recording {
+            return false;
+        }
+        let modifiers = &event.keystroke.modifiers;
+        let bare = !(modifiers.control || modifiers.alt || modifiers.shift || modifiers.platform);
+        match event.keystroke.key.as_str() {
+            "escape" if bare => self.stop_hotkey_recording(),
+            "backspace" | "delete" if bare => {
+                self.stop_hotkey_recording();
+                self.edit(cx, |settings| settings.popup_hotkey = None);
+            }
+            _ => match crate::hotkey::pressed_now().filter(crate::hotkey::Hotkey::is_valid) {
+                Some(hotkey) => {
+                    self.stop_hotkey_recording();
+                    self.edit(cx, move |settings| settings.popup_hotkey = Some(hotkey));
+                }
+                None => self.hotkey_rejected = true,
+            },
+        }
+        cx.notify();
+        true
     }
 
     /// Per-instance Usage Stats switches for enabled instances whose driver

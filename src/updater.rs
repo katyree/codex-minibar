@@ -238,16 +238,29 @@ pub fn open_release_notes() -> Result<()> {
 }
 
 /// Shows a one-shot success toast after an in-place update relaunch.
-pub fn show_post_update_success_if_needed() {
+/// Returns whether this launch follows one.
+pub fn show_post_update_success_if_needed() -> bool {
     match take_post_update_success_marker() {
-        Ok(Some(version)) => notifications::show_kind(
-            notifications::NotificationKind::Success,
-            crate::i18n::tr("update-complete"),
-            &crate::i18n::format("now-running-version", &[("version", version.to_string())]),
-        ),
-        Ok(None) => {}
-        Err(error) => eprintln!("failed to read post-update marker: {error:#}"),
+        Ok(Some(version)) => {
+            notifications::notify(update_complete_notification(&version));
+            true
+        }
+        Ok(None) => false,
+        Err(error) => {
+            eprintln!("failed to read post-update marker: {error:#}");
+            false
+        }
     }
+}
+
+/// The finished-update card; [`crate::whats_new`] fills in the summary.
+pub fn update_complete_notification(version: &str) -> notifications::Notification {
+    notifications::Notification::new(
+        notifications::NotificationKind::Success,
+        crate::i18n::tr("update-complete"),
+        &crate::i18n::format("now-running-version", &[("version", version.to_string())]),
+    )
+    .keyed(notifications::UPDATE_COMPLETE_KEY)
 }
 
 /// Keeps Windows "Installed apps" DisplayVersion in sync with this binary.
@@ -958,19 +971,38 @@ fn payload_root_from_extracted(destination: &Path) -> Result<PathBuf> {
 }
 
 pub fn open_url(url: &str) -> Result<()> {
-    open_shell_target(std::ffi::OsStr::new(url), url)
+    open_shell_target(url.into(), url.to_owned())
 }
 
 pub fn open_path(path: &Path) -> Result<()> {
-    let description = path.display().to_string();
-    open_shell_target(path.as_os_str(), &description)
+    open_shell_target(path.as_os_str().to_owned(), path.display().to_string())
 }
 
-fn open_shell_target(target: &std::ffi::OsStr, description: &str) -> Result<()> {
+/// Opens the target on a dedicated thread. ShellExecuteW pumps window
+/// messages while it runs; on the UI thread that dispatches queued GPUI
+/// foreground tasks re-entrantly from inside a click handler, while the app
+/// is already borrowed, and the resulting panic inside the window procedure
+/// aborts the process. Failures are therefore logged by the worker.
+fn open_shell_target(target: std::ffi::OsString, description: String) -> Result<()> {
+    std::thread::Builder::new()
+        .name("shell-open".into())
+        .spawn(move || {
+            if let Err(error) = shell_execute(&target, &description) {
+                crate::logger::info(format!("{error:#}"));
+            }
+        })
+        .context("spawn shell-open thread")?;
+    Ok(())
+}
+
+fn shell_execute(target: &std::ffi::OsStr, description: &str) -> Result<()> {
     #[cfg(windows)]
     {
         use std::ffi::OsStr;
         use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::System::Com::{
+            COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize,
+        };
         use windows_sys::Win32::UI::Shell::ShellExecuteW;
 
         let operation: Vec<u16> = OsStr::new("open")
@@ -978,6 +1010,13 @@ fn open_shell_target(target: &std::ffi::OsStr, description: &str) -> Result<()> 
             .chain(std::iter::once(0))
             .collect();
         let target: Vec<u16> = target.encode_wide().chain(std::iter::once(0)).collect();
+        // Shell extensions behind ShellExecuteW may require an STA.
+        let com = unsafe {
+            CoInitializeEx(
+                std::ptr::null(),
+                (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+            )
+        };
         let result = unsafe {
             ShellExecuteW(
                 std::ptr::null_mut(),
@@ -988,6 +1027,9 @@ fn open_shell_target(target: &std::ffi::OsStr, description: &str) -> Result<()> 
                 1,
             )
         };
+        if com >= 0 {
+            unsafe { CoUninitialize() };
+        }
         if result as isize <= 32 {
             bail!("ShellExecuteW failed for {description}");
         }

@@ -1,4 +1,4 @@
-//! Integrations: the Stream Deck companion installer.
+//! Integrations: the Stream Deck companion and the Command Palette extension.
 
 use futures::StreamExt;
 use gpui::{AnyElement, Context, IntoElement};
@@ -86,6 +86,11 @@ impl SettingsWindow {
                     .render(k),
             )
             .render(k);
-        vec![kit::card(k, vec![row])]
+        let mut rows = vec![
+            kit::section_heading(k, crate::i18n::tr("stream-deck")),
+            kit::card(k, vec![row]),
+        ];
+        rows.extend(self.command_palette_section(k, cx));
+        rows
     }
 }

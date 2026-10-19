@@ -149,6 +149,22 @@ impl SettingsWindow {
                 this.edit(cx, move |s| s.notifications.update_available = value)
             }),
         ));
+        update_rows.push(
+            kit::Row::new(
+                "about-whats-new-after-update-row",
+                crate::i18n::tr("show-what-s-new-after-updating"),
+            )
+            .description(
+                k,
+                crate::i18n::tr("a-short-summary-of-the-release-once-it-s-installed"),
+            )
+            .trailing(
+                Button::new("about-current-whats-new", crate::i18n::tr("view"))
+                    .on_click(kit::handler(|(), _, _| crate::whats_new::show_on_demand()))
+                    .render(k),
+            )
+            .render(k),
+        );
         let updates = kit::card(k, update_rows);
 
         let tile = |id: &'static str,

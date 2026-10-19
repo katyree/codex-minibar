@@ -44,15 +44,34 @@ fn presentation_hints() -> [&'static str; 5] {
 }
 const MAX_INDICATORS: usize = 3;
 
+/// Which widget list an indicator editor writes to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum IndicatorOwner {
+    Tray,
+    Taskbar,
+    /// Command Palette Dock bands.
+    Dock,
+}
+
+impl IndicatorOwner {
+    fn tag(self) -> &'static str {
+        match self {
+            Self::Tray => "tray",
+            Self::Taskbar => "taskbar",
+            Self::Dock => "dock",
+        }
+    }
+}
+
 /// The open widget editor: which widget and which indicator is expanded.
 #[derive(Clone)]
 pub(crate) struct TrayDialog {
-    widget_id: String,
-    expanded: Option<usize>,
+    pub(super) widget_id: String,
+    pub(super) expanded: Option<usize>,
 }
 
 impl TrayDialog {
-    fn new(widget_id: String) -> Self {
+    pub(super) fn new(widget_id: String) -> Self {
         Self {
             widget_id,
             expanded: Some(0),
@@ -183,7 +202,11 @@ fn indicator_detail(indicator: &TrayIndicator) -> String {
 }
 
 /// A dialog section title with a one-line hint under it.
-fn dialog_section(k: &Kit, title: &'static str, hint: impl Into<SharedString>) -> AnyElement {
+pub(super) fn dialog_section(
+    k: &Kit,
+    title: &'static str,
+    hint: impl Into<SharedString>,
+) -> AnyElement {
     div()
         .flex()
         .flex_col()
@@ -229,7 +252,7 @@ fn widget_short_summary(widget: &TrayWidget) -> String {
     }
 }
 
-fn default_indicator(provider: ProviderId) -> TrayIndicator {
+pub(super) fn default_indicator(provider: ProviderId) -> TrayIndicator {
     let metric = crate::provider_registry::descriptor(provider.kind())
         .default_tray_metrics
         .first()
@@ -240,7 +263,7 @@ fn default_indicator(provider: ProviderId) -> TrayIndicator {
 
 /// Sample quotas for previews, one per configured instance so indicators of
 /// every instance render.
-fn preview_limits() -> crate::limits::ProviderLimits {
+pub(super) fn preview_limits() -> crate::limits::ProviderLimits {
     // A reset a little over two hours out, so reset clocks show a time.
     let resets_at = Some(chrono::Utc::now() + chrono::Duration::minutes(137));
     let window = |used_percent| crate::limits::LimitWindow {
@@ -281,6 +304,16 @@ fn preview_limits() -> crate::limits::ProviderLimits {
                         window: window(1),
                     },
                 ],
+                ..Default::default()
+            },
+        ),
+        (
+            ProviderKind::OpenRouter,
+            crate::limits::RateLimits {
+                spending: Some(crate::limits::SpendingSummary {
+                    balance_microusd: Some(24_600_000),
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
         ),
@@ -572,11 +605,48 @@ impl SettingsWindow {
         self.set_widgets(next, cx);
     }
 
-    fn set_tray_dialog(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut TrayDialog)) {
-        if let Some(dialog) = self.tray_dialog.as_mut() {
+    fn set_indicator_dialog(
+        &mut self,
+        owner: IndicatorOwner,
+        cx: &mut Context<Self>,
+        f: impl FnOnce(&mut TrayDialog),
+    ) {
+        let dialog = match owner {
+            IndicatorOwner::Tray => self.tray_dialog.as_mut(),
+            IndicatorOwner::Taskbar => self.taskbar_dialog.as_mut(),
+            IndicatorOwner::Dock => self.dock_dialog.as_mut(),
+        };
+        if let Some(dialog) = dialog {
             f(dialog);
         }
         cx.notify();
+    }
+
+    /// Edits the indicators of one widget in the owner's list.
+    fn edit_indicators(
+        &mut self,
+        owner: IndicatorOwner,
+        widget_index: usize,
+        cx: &mut Context<Self>,
+        f: impl FnOnce(&mut Vec<TrayIndicator>),
+    ) {
+        match owner {
+            IndicatorOwner::Tray => self.update_widgets(cx, |widgets| {
+                if let Some(widget) = widgets.get_mut(widget_index) {
+                    f(&mut widget.indicators);
+                }
+            }),
+            IndicatorOwner::Taskbar => self.update_taskbar_widgets(cx, |widgets| {
+                if let Some(widget) = widgets.get_mut(widget_index) {
+                    f(&mut widget.indicators);
+                }
+            }),
+            IndicatorOwner::Dock => self.update_dock_widgets(cx, |widgets| {
+                if let Some(widget) = widgets.get_mut(widget_index) {
+                    f(&mut widget.indicators);
+                }
+            }),
+        }
     }
 
     /// The widget editor: a live preview header, then one page that reads top
@@ -649,7 +719,18 @@ impl SettingsWindow {
                 )
             };
             body.push(dialog_section(k, crate::i18n::tr("indicators"), hint));
-            let indicators = self.tray_indicators(k, index, &widget, dialog.expanded, window, cx);
+            let indicators = self.tray_indicators(
+                k,
+                IndicatorOwner::Tray,
+                index,
+                &widget.id,
+                &widget.indicators,
+                MAX_INDICATORS,
+                reset_clock,
+                dialog.expanded,
+                window,
+                cx,
+            );
             body.push(kit::appear(
                 k,
                 format!("tray-dlg-{}-{reset_clock}", widget.id),
@@ -784,11 +865,15 @@ impl SettingsWindow {
     /// "Add" button below. Reset clocks follow a single indicator, so they
     /// show its fields directly.
     #[allow(clippy::too_many_arguments)]
-    fn tray_indicators(
+    pub(super) fn tray_indicators(
         &mut self,
         k: &mut Kit,
+        owner: IndicatorOwner,
         index: usize,
-        widget: &TrayWidget,
+        widget_id: &str,
+        indicators: &[TrayIndicator],
+        max: usize,
+        single: bool,
         expanded: Option<usize>,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -798,13 +883,12 @@ impl SettingsWindow {
             .first()
             .copied()
             .unwrap_or_default();
-        if widget.presentation.is_reset_clock() {
-            let indicator = widget
-                .indicators
+        if single {
+            let indicator = indicators
                 .first()
                 .cloned()
                 .unwrap_or_else(|| default_indicator(first_enabled));
-            let fields = self.indicator_fields(k, index, 0, &indicator, false, window, cx);
+            let fields = self.indicator_fields(k, owner, index, 0, &indicator, false, window, cx);
             return kit::card_surface(
                 k,
                 [div()
@@ -815,15 +899,16 @@ impl SettingsWindow {
             )
             .into_any_element();
         }
-        let count = widget.indicators.len();
+        let count = indicators.len();
         let mut column = div().flex().flex_col().gap(px(8.0));
-        for (slot, indicator) in widget.indicators.iter().enumerate() {
+        for (slot, indicator) in indicators.iter().enumerate() {
             let card = self.indicator_card(
                 k,
+                owner,
                 index,
                 slot,
                 count,
-                &widget.id,
+                widget_id,
                 indicator,
                 expanded == Some(slot),
                 window,
@@ -831,30 +916,29 @@ impl SettingsWindow {
             );
             column = column.child(kit::appear(
                 k,
-                format!("tray-{}-indicator-{slot}-in", widget.id),
+                format!("{}-{widget_id}-indicator-{slot}-in", owner.tag()),
                 card,
             ));
         }
-        if count < MAX_INDICATORS {
-            let fallback = widget
-                .indicators
+        if count < max {
+            let fallback = indicators
                 .last()
                 .and_then(TrayIndicator::provider)
                 .unwrap_or(first_enabled);
             column = column.child(
                 div().flex().child(
                     Button::new(
-                        format!("tray-{}-add-indicator", widget.id),
+                        format!("{}-{widget_id}-add-indicator", owner.tag()),
                         crate::i18n::tr("add-indicator"),
                     )
                     .with_icon("plus-bold")
                     .on_click(Self::h(cx, move |this, (), _, cx| {
-                        this.update_widgets(cx, |widgets| {
-                            if let Some(widget) = widgets.get_mut(index) {
-                                widget.indicators.push(default_indicator(fallback));
-                            }
+                        this.edit_indicators(owner, index, cx, |indicators| {
+                            indicators.push(default_indicator(fallback));
                         });
-                        this.set_tray_dialog(cx, |dialog| dialog.expanded = Some(count));
+                        this.set_indicator_dialog(owner, cx, |dialog| {
+                            dialog.expanded = Some(count)
+                        });
                     }))
                     .render(k),
                 ),
@@ -869,6 +953,7 @@ impl SettingsWindow {
     fn indicator_card(
         &mut self,
         k: &mut Kit,
+        owner: IndicatorOwner,
         widget_index: usize,
         slot: usize,
         count: usize,
@@ -878,7 +963,7 @@ impl SettingsWindow {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let id = format!("tray-{widget_id}-indicator-{slot}");
+        let id = format!("{}-{widget_id}-indicator-{slot}", owner.tag());
         let swap = |delta: isize| {
             Self::h(cx, move |this, (), _, cx| {
                 let target = slot as isize + delta;
@@ -886,16 +971,13 @@ impl SettingsWindow {
                     return;
                 }
                 let target = target as usize;
-                this.update_widgets(cx, |widgets| {
-                    let Some(widget) = widgets.get_mut(widget_index) else {
-                        return;
-                    };
-                    if target < widget.indicators.len() {
-                        widget.indicators.swap(slot, target);
+                this.edit_indicators(owner, widget_index, cx, |indicators| {
+                    if target < indicators.len() {
+                        indicators.swap(slot, target);
                     }
                 });
                 // The expanded card travels with its indicator.
-                this.set_tray_dialog(cx, |dialog| {
+                this.set_indicator_dialog(owner, cx, |dialog| {
                     dialog.expanded = match dialog.expanded {
                         Some(open) if open == slot => Some(target),
                         Some(open) if open == target => Some(slot),
@@ -905,15 +987,12 @@ impl SettingsWindow {
             })
         };
         let remove = Self::h(cx, move |this, (), _, cx| {
-            this.update_widgets(cx, |widgets| {
-                if let Some(widget) = widgets.get_mut(widget_index)
-                    && widget.indicators.len() > 1
-                    && slot < widget.indicators.len()
-                {
-                    widget.indicators.remove(slot);
+            this.edit_indicators(owner, widget_index, cx, |indicators| {
+                if indicators.len() > 1 && slot < indicators.len() {
+                    indicators.remove(slot);
                 }
             });
-            this.set_tray_dialog(cx, |dialog| {
+            this.set_indicator_dialog(owner, cx, |dialog| {
                 dialog.expanded = match dialog.expanded {
                     Some(open) if open == slot => None,
                     Some(open) if open > slot => Some(open - 1),
@@ -922,7 +1001,7 @@ impl SettingsWindow {
             });
         });
         let toggle = Self::h(cx, move |this, open: bool, _, cx| {
-            this.set_tray_dialog(cx, |dialog| dialog.expanded = open.then_some(slot))
+            this.set_indicator_dialog(owner, cx, |dialog| dialog.expanded = open.then_some(slot))
         });
         let theme = &k.theme;
         let (glyph, tint, title) = match indicator.provider() {
@@ -989,14 +1068,17 @@ impl SettingsWindow {
             .icon(mark)
             .description(k, indicator_detail(indicator))
             .trailing(controls);
-        let fields = self.indicator_fields(k, widget_index, slot, indicator, true, window, cx);
+        let fields =
+            self.indicator_fields(k, owner, widget_index, slot, indicator, true, window, cx);
         kit::expander(k, id, header, expanded, toggle, move |_| fields)
     }
 
     /// Provider, metric, value and color for one indicator.
+    #[allow(clippy::too_many_arguments)]
     fn indicator_fields(
         &mut self,
         k: &mut Kit,
+        owner: IndicatorOwner,
         widget_index: usize,
         slot: usize,
         indicator: &TrayIndicator,
@@ -1043,7 +1125,7 @@ impl SettingsWindow {
                 );
                 metric_labels.len() - 1
             });
-        let key = format!("tray-{widget_index}-{slot}");
+        let key = format!("{}-{widget_index}-{slot}", owner.tag());
         let edit = |cx: &mut Context<Self>,
                     f: IndicatorEdit,
                     options: Vec<ProviderId>,
@@ -1051,16 +1133,13 @@ impl SettingsWindow {
             Self::h(cx, move |this, choice: usize, _, cx| {
                 let options = options.clone();
                 let metrics = metrics.clone();
-                this.update_widgets(cx, move |widgets| {
-                    let Some(widget) = widgets.get_mut(widget_index) else {
-                        return;
-                    };
-                    if widget.indicators.is_empty() {
-                        widget.indicators.push(default_indicator(
+                this.edit_indicators(owner, widget_index, cx, move |indicators| {
+                    if indicators.is_empty() {
+                        indicators.push(default_indicator(
                             options.first().copied().unwrap_or_default(),
                         ));
                     }
-                    if let Some(indicator) = widget.indicators.get_mut(slot) {
+                    if let Some(indicator) = indicators.get_mut(slot) {
                         f(indicator, choice, &options, &metrics);
                     }
                 })
@@ -1151,11 +1230,16 @@ impl SettingsWindow {
             );
             second = second.child(kit::field(k, crate::i18n::tr("show"), value_box));
         }
-        second = second.child(kit::field(k, crate::i18n::tr("color"), color_box));
+        // The Dock draws band text in its own color.
+        let colored = owner != IndicatorOwner::Dock;
+        if colored {
+            second = second.child(kit::field(k, crate::i18n::tr("color"), color_box));
+        }
         grid = grid.child(second);
-        if indicator.color_mode == TrayColorMode::Fixed {
+        if colored && indicator.color_mode == TrayColorMode::Fixed {
             grid = grid.child(self.color_picker(
                 k,
+                owner,
                 widget_index,
                 slot,
                 indicator.fixed_color,
@@ -1166,9 +1250,11 @@ impl SettingsWindow {
         grid.into_any_element()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn color_picker(
         &mut self,
         k: &mut Kit,
+        owner: IndicatorOwner,
         widget_index: usize,
         slot: usize,
         current: TrayFixedColor,
@@ -1176,11 +1262,8 @@ impl SettingsWindow {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let set = move |this: &mut Self, color: TrayFixedColor, cx: &mut Context<Self>| {
-            this.update_widgets(cx, |widgets| {
-                if let Some(indicator) = widgets
-                    .get_mut(widget_index)
-                    .and_then(|widget| widget.indicators.get_mut(slot))
-                {
+            this.edit_indicators(owner, widget_index, cx, |indicators| {
+                if let Some(indicator) = indicators.get_mut(slot) {
                     indicator.fixed_color = color;
                 }
             })
@@ -1191,7 +1274,10 @@ impl SettingsWindow {
             let selected = color == current;
             swatches = swatches.child(
                 div()
-                    .id(eid(format!("tray-swatch-{widget_index}-{slot}-{index}")))
+                    .id(eid(format!(
+                        "{}-swatch-{widget_index}-{slot}-{index}",
+                        owner.tag()
+                    )))
                     .size(px(26.0))
                     .rounded(px(6.0))
                     .bg(rgb8((red, green, blue)))
@@ -1218,7 +1304,7 @@ impl SettingsWindow {
             current.red, current.green, current.blue
         );
         let hex_input = self.input(
-            format!("tray-hex-{widget_index}-{slot}"),
+            format!("{}-hex-{widget_index}-{slot}", owner.tag()),
             &hex,
             "#RRGGBB",
             false,

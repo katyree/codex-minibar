@@ -54,8 +54,10 @@ pub(crate) use state::UiState;
 
 pub(crate) use actions::*;
 use bridge::*;
-pub(crate) use formatting::capitalize_plan_name;
 use formatting::*;
+pub(crate) use formatting::{
+    capitalize_plan_name, format_reset_in, format_token_count, format_usd,
+};
 pub(crate) use navigation::PopupView;
 use navigation::*;
 use state::*;
@@ -64,6 +66,8 @@ use state::*;
 pub(crate) enum PendingPopupView {
     Home,
     Provider(ProviderId),
+    /// Home when it shows the instance, otherwise the tab that does.
+    Nearest(ProviderId),
 }
 
 static PENDING_POPUP_VIEW: Mutex<Option<PendingPopupView>> = Mutex::new(None);
@@ -74,9 +78,14 @@ pub(crate) enum PopupCommand {
     Publish(Box<UiState>),
     Show {
         anchor: Option<(i32, i32)>,
+        /// Open toward the anchor's end of the taskbar, not the tray's.
+        beside: bool,
     },
     Hide,
     SelectView(PopupView),
+    /// Go to the page nearest an instance: Home when it shows the instance,
+    /// otherwise the tab that does.
+    SelectNearest(ProviderId),
     /// Enter Home edit mode, opening Home.
     StartHomeEditing,
     AppearanceChanged,
@@ -130,13 +139,23 @@ pub fn request_home_view() {
     request_view(PendingPopupView::Home);
 }
 
+/// Requests the page nearest `provider` for the next popup show: Home when
+/// it shows the instance, otherwise the instance's tab. Taskbar widgets
+/// open this way.
+pub fn request_nearest_view(provider: ProviderId) {
+    request_view(PendingPopupView::Nearest(provider));
+}
+
 fn request_view(view: PendingPopupView) {
     if popup::is_visible() && !popup::is_closing() {
         // An open popup switches pages right away, with its usual slide.
-        send_command(PopupCommand::SelectView(match view {
-            PendingPopupView::Home => PopupView::Home,
-            PendingPopupView::Provider(provider) => PopupView::from_provider(provider),
-        }));
+        send_command(match view {
+            PendingPopupView::Home => PopupCommand::SelectView(PopupView::Home),
+            PendingPopupView::Provider(provider) => {
+                PopupCommand::SelectView(PopupView::from_provider(provider))
+            }
+            PendingPopupView::Nearest(provider) => PopupCommand::SelectNearest(provider),
+        });
     } else if let Ok(mut pending) = PENDING_POPUP_VIEW.lock() {
         *pending = Some(view);
     }

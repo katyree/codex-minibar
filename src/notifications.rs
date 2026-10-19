@@ -17,6 +17,7 @@ pub const AUMID: &str = "dev.CodexMinibar";
 const NEW_WINDOW_MINIMUM_ADVANCE: Duration = Duration::minutes(5);
 
 static SOUND_ENABLED: AtomicBool = AtomicBool::new(true);
+static FOLLOW_DO_NOT_DISTURB: AtomicBool = AtomicBool::new(true);
 
 /// What a notification is about; picks its icon, color, sound and lifetime.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -59,6 +60,8 @@ impl NotificationKind {
 pub enum NotificationAction {
     InstallUpdate,
     OpenUrl(String),
+    /// Never treat this executable as a game again.
+    IgnoreGame(String),
 }
 
 impl NotificationAction {
@@ -81,6 +84,7 @@ impl NotificationAction {
                     eprintln!("failed to open {url}: {error:#}");
                 }
             }
+            NotificationAction::IgnoreGame(path) => crate::game_mode::ignore_game(path),
         });
     }
 }
@@ -115,6 +119,14 @@ pub enum Progress {
 /// Key of the card that follows an update from download to restart.
 pub const UPDATE_PROGRESS_KEY: &str = "update-progress";
 
+/// Key of the card announcing a finished update; the release summary,
+/// once fetched, fills it in place.
+pub const UPDATE_COMPLETE_KEY: &str = "update-complete";
+
+/// Key of the card announcing game mode; turning it off replaces the "on"
+/// card in place.
+pub const GAME_MODE_KEY: &str = "game-mode";
+
 #[derive(Clone, Debug)]
 pub struct Notification {
     pub kind: NotificationKind,
@@ -129,6 +141,9 @@ pub struct Notification {
     /// Cards with progress stay until a notification without progress
     /// replaces them (or they are closed by hand).
     pub progress: Option<Progress>,
+    /// A release summary drawn under the text. Cards with one stay until
+    /// they are closed by hand.
+    pub summary: Option<std::sync::Arc<crate::whats_new::Content>>,
 }
 
 impl Notification {
@@ -141,6 +156,7 @@ impl Notification {
             limits: None,
             key: None,
             progress: None,
+            summary: None,
         }
     }
 
@@ -151,6 +167,16 @@ impl Notification {
 
     pub fn with_progress(mut self, progress: Progress) -> Self {
         self.progress = Some(progress);
+        self
+    }
+
+    pub fn with_summary(mut self, summary: crate::whats_new::Content) -> Self {
+        self.summary = Some(std::sync::Arc::new(summary));
+        self
+    }
+
+    pub fn with_action(mut self, label: &str, action: NotificationAction) -> Self {
+        self.actions.push((label.to_owned(), action));
         self
     }
 
@@ -207,6 +233,37 @@ pub fn set_sound_enabled(enabled: bool) {
     SOUND_ENABLED.store(enabled, Ordering::Relaxed);
 }
 
+/// Mirrors `notifications.follow_do_not_disturb`.
+pub fn set_follow_do_not_disturb(enabled: bool) {
+    FOLLOW_DO_NOT_DISTURB.store(enabled, Ordering::Relaxed);
+}
+
+/// Why an unsolicited notification is held back right now, if it is. The
+/// card announcing game mode itself is exempt from the game-mode rule.
+fn quiet_reason(game_mode_card: bool) -> Option<&'static str> {
+    if crate::game_mode::is_active() && !game_mode_card {
+        return Some("game mode");
+    }
+    #[cfg(windows)]
+    if FOLLOW_DO_NOT_DISTURB.load(Ordering::Relaxed) && windows_impl::do_not_disturb_active() {
+        return Some("Windows Do Not Disturb");
+    }
+    None
+}
+
+/// Whether the card answers something the user is doing right now: an
+/// update they started, or anything while the popup or Settings is open.
+/// Those always show; quiet hours only hold back what arrives unasked.
+fn requested_by_user(notification: &Notification) -> bool {
+    notification.progress.is_some()
+        || matches!(
+            notification.key,
+            Some(UPDATE_PROGRESS_KEY | UPDATE_COMPLETE_KEY)
+        )
+        || crate::popup::is_visible()
+        || crate::settings_window::is_open()
+}
+
 /// Registers the process AUMID so the taskbar and shell say "Codex Minibar".
 pub fn initialize() {
     #[cfg(windows)]
@@ -217,6 +274,15 @@ pub fn initialize() {
 
 /// Posts a notification to the toast host. Safe from any thread.
 pub fn notify(notification: Notification) {
+    if !requested_by_user(&notification)
+        && let Some(reason) = quiet_reason(notification.key == Some(GAME_MODE_KEY))
+    {
+        crate::logger::info(format!(
+            "Notification held back ({reason}): {} — {}",
+            notification.title, notification.body
+        ));
+        return;
+    }
     // Progress ticks arrive many times a second; only results are logged.
     if notification.progress.is_none() {
         crate::logger::info(format!(
@@ -267,6 +333,34 @@ pub fn show_update_failed(error: &anyhow::Error) {
         )
         .keyed(UPDATE_PROGRESS_KEY),
     );
+}
+
+/// Game mode turned on or off; `game` is the `(name, executable)` that
+/// turned it on, which the card offers to never treat as a game again.
+pub fn show_game_mode_changed(active: bool, game: Option<(String, String)>) {
+    let (title, body) = match (&game, active) {
+        (Some((name, _)), true) => (
+            crate::i18n::tr("game-mode-on-title"),
+            crate::i18n::format("game-mode-on-game-body", &[("game", name.clone())]),
+        ),
+        (None, true) => (
+            crate::i18n::tr("game-mode-on-title"),
+            crate::i18n::tr("game-mode-on-body").to_owned(),
+        ),
+        (_, false) => (
+            crate::i18n::tr("game-mode-off-title"),
+            crate::i18n::tr("game-mode-off-body").to_owned(),
+        ),
+    };
+    let mut notification =
+        Notification::new(NotificationKind::Info, title, &body).keyed(GAME_MODE_KEY);
+    if let Some((_, path)) = game.filter(|_| active) {
+        notification = notification.with_action(
+            crate::i18n::tr("not-a-game"),
+            NotificationAction::IgnoreGame(path),
+        );
+    }
+    notify(notification);
 }
 
 /// A new incident on a provider's public status page.
@@ -355,10 +449,12 @@ fn show_activation(
     });
 }
 
-/// Plays the sound of `notification` unless sounds are off or Windows says
-/// the user is presenting, gaming full screen or otherwise busy.
+/// Plays the sound of `notification` unless sounds are off, quiet hours are
+/// on, or Windows says the user is presenting, gaming full screen or
+/// otherwise busy.
 pub(crate) fn play_sound(notification: &Notification) {
-    if !SOUND_ENABLED.load(Ordering::Relaxed) {
+    // Cards that still show during quiet hours do so silently.
+    if !SOUND_ENABLED.load(Ordering::Relaxed) || quiet_reason(false).is_some() {
         return;
     }
     #[cfg(windows)]
@@ -1008,12 +1104,13 @@ mod tests {
 
 #[cfg(windows)]
 mod windows_impl {
-    use std::path::PathBuf;
+    use std::{path::PathBuf, sync::OnceLock};
 
     use anyhow::{Context, Result};
     use windows_sys::Win32::{
         Foundation::ERROR_SUCCESS,
         Media::Audio::{PlaySoundW, SND_ASYNC, SND_MEMORY, SND_NODEFAULT},
+        System::LibraryLoader::{GetModuleHandleW, GetProcAddress},
         System::Registry::{
             HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_OPTION_NON_VOLATILE, REG_SZ, RegCloseKey,
             RegCreateKeyExW, RegSetValueExW,
@@ -1043,6 +1140,59 @@ mod windows_impl {
         let mut state = 0;
         let status = unsafe { SHQueryUserNotificationState(&mut state) };
         status != 0 || state == QUNS_ACCEPTS_NOTIFICATIONS || state == QUNS_QUIET_TIME
+    }
+
+    /// Whether Do Not Disturb (Focus Assist on Windows 10) is on, including
+    /// when a Focus session or an automatic rule turned it on. Windows has
+    /// no public API for this outside packaged apps; the shell publishes the
+    /// active quiet-hours profile as a WNF state (0 = off, 1 = priority
+    /// only, 2 = alarms only). Any failure reads as "off".
+    pub(super) fn do_not_disturb_active() -> bool {
+        type NtQueryWnfStateData = unsafe extern "system" fn(
+            state_name: *const u64,
+            type_id: *const std::ffi::c_void,
+            explicit_scope: *const std::ffi::c_void,
+            change_stamp: *mut u32,
+            buffer: *mut std::ffi::c_void,
+            buffer_size: *mut u32,
+        ) -> i32;
+        const WNF_SHEL_QUIETHOURS_ACTIVE_PROFILE_CHANGED: u64 = 0x0D83_063E_A3BF_1C75;
+        static QUERY: OnceLock<Option<NtQueryWnfStateData>> = OnceLock::new();
+
+        let Some(query) = *QUERY.get_or_init(|| {
+            let ntdll: Vec<u16> = "ntdll.dll"
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+            let module = unsafe { GetModuleHandleW(ntdll.as_ptr()) };
+            if module.is_null() {
+                return None;
+            }
+            let address =
+                unsafe { GetProcAddress(module, c"NtQueryWnfStateData".as_ptr().cast()) }?;
+            Some(unsafe {
+                std::mem::transmute::<unsafe extern "system" fn() -> isize, NtQueryWnfStateData>(
+                    address,
+                )
+            })
+        }) else {
+            return false;
+        };
+        let state_name = WNF_SHEL_QUIETHOURS_ACTIVE_PROFILE_CHANGED;
+        let mut change_stamp = 0u32;
+        let mut profile = 0u32;
+        let mut size = size_of::<u32>() as u32;
+        let status = unsafe {
+            query(
+                &state_name,
+                std::ptr::null(),
+                std::ptr::null(),
+                &mut change_stamp,
+                (&raw mut profile).cast(),
+                &mut size,
+            )
+        };
+        status >= 0 && size as usize >= size_of::<u32>() && profile != 0
     }
 
     /// Plays a WAV image asynchronously; a newer sound replaces the current one.

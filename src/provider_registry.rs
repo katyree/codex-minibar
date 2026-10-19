@@ -29,6 +29,16 @@ impl MetricDescriptor {
     pub fn localized_label(&self) -> &'static str {
         crate::i18n::tr(self.label_key)
     }
+
+    /// A few characters for tight spaces: `5h` and `7d` for the standard
+    /// session and weekly windows, the full label otherwise.
+    pub fn localized_short_label(&self) -> &'static str {
+        match self.label_key {
+            "msg-5h-session" => crate::i18n::tr("short-5h"),
+            "weekly" => crate::i18n::tr("short-7d"),
+            _ => self.localized_label(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -192,6 +202,26 @@ const MUSE_METRICS: &[MetricDescriptor] = &[MetricDescriptor {
     label_key: "weekly",
     source: MetricSource::Secondary,
 }];
+const COMMAND_CODE_METRICS: &[MetricDescriptor] = &[
+    MetricDescriptor {
+        id: "command-code.session",
+        label: "5h session",
+        label_key: "msg-5h-session",
+        source: MetricSource::Primary,
+    },
+    MetricDescriptor {
+        id: "command-code.weekly",
+        label: "Weekly",
+        label_key: "weekly",
+        source: MetricSource::Secondary,
+    },
+    MetricDescriptor {
+        id: "command-code.monthly",
+        label: "Monthly",
+        label_key: "monthly",
+        source: MetricSource::Additional(crate::commandcode::MONTHLY_LIMIT_ID),
+    },
+];
 
 pub const PROVIDERS: &[ProviderDescriptor] = &[
     ProviderDescriptor {
@@ -330,6 +360,18 @@ pub const PROVIDERS: &[ProviderDescriptor] = &[
         metrics: MUSE_METRICS,
         default_tray_metrics: &["muse-ai.weekly"],
     },
+    ProviderDescriptor {
+        kind: ProviderKind::CommandCode,
+        id: "command-code",
+        display_name: "Command Code",
+        icon: "commandcode",
+        brand_rgb: (92, 92, 92),
+        supports_activation: false,
+        include_in_total_spend: true,
+        supports_multiple_instances: false,
+        metrics: COMMAND_CODE_METRICS,
+        default_tray_metrics: &["command-code.session", "command-code.weekly"],
+    },
 ];
 
 pub fn descriptor(provider: ProviderKind) -> &'static ProviderDescriptor {
@@ -374,6 +416,7 @@ pub fn light_surface_brand_rgb(provider: ProviderKind) -> (u8, u8, u8) {
         ProviderKind::Kiro => (105, 78, 198),
         ProviderKind::Junie => (30, 125, 64),
         ProviderKind::Muse => (41, 95, 191),
+        ProviderKind::CommandCode => (51, 51, 51),
     }
 }
 
@@ -383,7 +426,7 @@ pub fn light_surface_brand_rgb(provider: ProviderKind) -> (u8, u8, u8) {
 /// on light cards via [`light_surface_brand_rgb`].
 pub fn dark_surface_brand_rgb(provider: ProviderKind) -> (u8, u8, u8) {
     match provider {
-        ProviderKind::Cursor | ProviderKind::Grok => (255, 255, 255),
+        ProviderKind::Cursor | ProviderKind::Grok | ProviderKind::CommandCode => (255, 255, 255),
         _ => descriptor(provider).brand_rgb,
     }
 }
@@ -440,6 +483,7 @@ pub fn supports_banked_resets(provider: ProviderKind) -> bool {
             | ProviderKind::Kiro
             | ProviderKind::Junie
             | ProviderKind::Muse
+            | ProviderKind::CommandCode
     )
 }
 

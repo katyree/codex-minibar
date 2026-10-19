@@ -16,6 +16,11 @@ pub(crate) fn icon_path(name: &str) -> SharedString {
     SharedString::from(format!("icons/{name}.svg"))
 }
 
+/// Monochrome SVG source of an icon, for renderers outside GPUI.
+pub(crate) fn svg_source(name: &str) -> Option<&'static str> {
+    source(name)
+}
+
 fn source(name: &str) -> Option<&'static str> {
     Some(match name {
         "fluent-refresh" => include_str!("../../../assets/icons/fluent-arrow-sync-24-filled.svg"),
@@ -67,6 +72,7 @@ fn source(name: &str) -> Option<&'static str> {
         "kiro" => include_str!("../../../assets/icons/kiro-iconify.svg"),
         "junie" => include_str!("../../../assets/icons/junie-iconify.svg"),
         "muse-ai" => include_str!("../../../assets/icons/muse-ai.svg"),
+        "commandcode" => include_str!("../../../assets/icons/commandcode.svg"),
         "chatgpt" => include_str!("../../../assets/icons/chatgpt-iconify.svg"),
         "fluent-folder" => include_str!("../../../assets/icons/fluent-folder-16-filled.svg"),
         "fluent-dismiss" => include_str!("../../../assets/icons/fluent-dismiss-16-regular.svg"),
@@ -103,6 +109,7 @@ fn source(name: &str) -> Option<&'static str> {
         "flag-fill" => include_str!("../../../assets/icons/ph-flag-fill.svg"),
         "folder-fill" => include_str!("../../../assets/icons/ph-folder-fill.svg"),
         "folder-open-fill" => include_str!("../../../assets/icons/ph-folder-open-fill.svg"),
+        "game-controller-fill" => include_str!("../../../assets/icons/ph-game-controller-fill.svg"),
         "git-pull-request-fill" => {
             include_str!("../../../assets/icons/ph-git-pull-request-fill.svg")
         }
@@ -117,6 +124,7 @@ fn source(name: &str) -> Option<&'static str> {
         "plugs-connected-fill" => include_str!("../../../assets/icons/ph-plugs-connected-fill.svg"),
         "plus-bold" => include_str!("../../../assets/icons/ph-plus-bold.svg"),
         "plus-fill" => include_str!("../../../assets/icons/ph-plus-fill.svg"),
+        "prohibit-fill" => include_str!("../../../assets/icons/ph-prohibit-fill.svg"),
         "puzzle-piece-fill" => include_str!("../../../assets/icons/ph-puzzle-piece-fill.svg"),
         "seal-check-fill" => include_str!("../../../assets/icons/ph-seal-check-fill.svg"),
         "sign-in-bold" => include_str!("../../../assets/icons/ph-sign-in-bold.svg"),
@@ -197,6 +205,7 @@ fn color_source(name: &str) -> Option<&'static [u8]> {
             include_bytes!("../../../assets/icons/fluent-color-calendar-clock-24.svg")
         }
         "chat-24" => include_bytes!("../../../assets/icons/fluent-color-chat-24.svg"),
+        "gauge-24" => include_bytes!("../../../assets/icons/fluent-color-gauge-24.svg"),
         "history-24" => include_bytes!("../../../assets/icons/fluent-color-history-24.svg"),
         "home-24" => include_bytes!("../../../assets/icons/fluent-color-home-24.svg"),
         "paint-brush-24" => include_bytes!("../../../assets/icons/fluent-color-paint-brush-24.svg"),
