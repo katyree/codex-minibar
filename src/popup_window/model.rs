@@ -411,7 +411,7 @@ pub(crate) fn provider_cards<'a>(
         });
     }
     if visible(&credits_brick_id(kind))
-        && let Some(value) = credits_display_value(limits)
+        && let Some(value) = credits_display_value(kind, limits)
     {
         cards.push(Card::Credits { value });
     }
