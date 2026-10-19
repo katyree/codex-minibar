@@ -88,7 +88,8 @@ impl Backdrop {
     ) -> Result<Self> {
         // This enables brush access to the desktop, NOT a window-wide material.
         // It is supported on Win11; older systems retain plain transparency.
-        // 先检查系统支持，避免 Windows 10 失败回退时异步销毁刚创建的消息队列。
+        // Probe support first so the Win10 fallback never tears down a freshly
+        // created dispatcher queue.
         let enabled = 1i32;
         let status = unsafe {
             DwmSetWindowAttribute(
