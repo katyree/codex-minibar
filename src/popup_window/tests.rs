@@ -424,16 +424,64 @@ fn credits_only_render_for_a_real_balance_or_unlimited_access() {
     let mut limits = plan_limits("plus");
     limits.credits.has_credits = true;
     limits.credits.balance = Some("undefined".into());
-    assert_eq!(credits_display_value(&limits), None);
+    assert_eq!(credits_display_value(ProviderKind::Codex, &limits), None);
     assert!(!popup_sections(ProviderKind::Codex, &limits, false).contains(&PopupSection::Credits));
 
     limits.credits.balance = Some("$12.50".into());
-    assert_eq!(credits_display_value(&limits).as_deref(), Some("$12.50"));
+    assert_eq!(
+        credits_display_value(ProviderKind::Codex, &limits).as_deref(),
+        Some("$12.50")
+    );
     assert!(popup_sections(ProviderKind::Codex, &limits, false).contains(&PopupSection::Credits));
 
     limits.credits = Default::default();
     limits.credits.unlimited = true;
-    assert_eq!(credits_display_value(&limits).as_deref(), Some("Unlimited"));
+    assert_eq!(
+        credits_display_value(ProviderKind::Codex, &limits).as_deref(),
+        Some("Unlimited")
+    );
+}
+
+#[test]
+fn codex_credits_display_whole_grouped_counts_without_changing_the_balance() {
+    for (balance, expected) in [
+        ("53556.3441260001", "53,556"),
+        (" 53556.8 ", "53,557"),
+        ("999.5", "1,000"),
+        ("1000000", "1,000,000"),
+        ("0", "0"),
+        ("0.4", "0"),
+    ] {
+        let mut limits = plan_limits("plus");
+        limits.credits.has_credits = true;
+        limits.credits.balance = Some(balance.into());
+        assert_eq!(
+            credits_display_value(ProviderKind::Codex, &limits).as_deref(),
+            Some(expected)
+        );
+        assert_eq!(limits.credits.balance.as_deref(), Some(balance));
+        assert_eq!(
+            credits_display_value(ProviderKind::CommandCode, &limits).as_deref(),
+            Some(balance.trim())
+        );
+        for surface in [PopupSurface::HomeTab, PopupSurface::ProviderTab] {
+            let cards = test_cards(
+                ProviderKind::Codex,
+                true,
+                &limits,
+                &all_visible(),
+                surface,
+                true,
+                true,
+                true,
+            );
+            assert!(
+                cards
+                    .iter()
+                    .any(|card| matches!(card, Card::Credits { value } if value == expected))
+            );
+        }
+    }
 }
 
 #[test]
