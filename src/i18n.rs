@@ -24,6 +24,7 @@ const ZH_TW: &str = include_str!("../locales/zh-TW/app.ftl");
 const JA: &str = include_str!("../locales/ja/app.ftl");
 const DE: &str = include_str!("../locales/de/app.ftl");
 const FR: &str = include_str!("../locales/fr/app.ftl");
+const KO_KR: &str = include_str!("../locales/ko-KR/app.ftl");
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -39,12 +40,13 @@ pub enum Language {
     German,
     French,
     TraditionalChinese,
+    Korean,
 }
 
 static CURRENT: AtomicU8 = AtomicU8::new(1);
 
 impl Language {
-    pub const SUPPORTED: [Self; 9] = [
+    pub const SUPPORTED: [Self; 10] = [
         Self::English,
         Self::Russian,
         Self::BrazilianPortuguese,
@@ -54,6 +56,7 @@ impl Language {
         Self::German,
         Self::French,
         Self::TraditionalChinese,
+        Self::Korean,
     ];
 
     pub fn apply(self) {
@@ -78,6 +81,7 @@ impl Language {
             Self::German => 7,
             Self::French => 8,
             Self::TraditionalChinese => 9,
+            Self::Korean => 10,
         }
     }
     pub fn from_index(index: usize) -> Self {
@@ -86,7 +90,7 @@ impl Language {
             .copied()
             .unwrap_or(Self::Auto)
     }
-    pub fn labels() -> [&'static str; 10] {
+    pub fn labels() -> [&'static str; 11] {
         [
             tr("auto-windows"),
             "English",
@@ -98,6 +102,7 @@ impl Language {
             "Deutsch",
             "Français",
             "繁體中文",
+            "한국어",
         ]
     }
 }
@@ -139,6 +144,7 @@ fn language_from_tag(tag: &str) -> Language {
         "ja" => Language::Japanese,
         "de" => Language::German,
         "fr" => Language::French,
+        "ko" => Language::Korean,
         _ => Language::English,
     }
 }
@@ -156,6 +162,7 @@ fn language_from_windows_langid(langid: u16) -> Language {
         0x11 => "ja",
         0x07 => "de",
         0x0c => "fr",
+        0x12 => "ko",
         _ => "en",
     })
 }
@@ -239,6 +246,7 @@ struct Catalogs {
     ja: FluentBundle<FluentResource>,
     de: FluentBundle<FluentResource>,
     fr: FluentBundle<FluentResource>,
+    ko_kr: FluentBundle<FluentResource>,
 }
 impl Catalogs {
     fn new() -> Self {
@@ -252,6 +260,7 @@ impl Catalogs {
             ja: bundle("ja", JA),
             de: bundle("de", DE),
             fr: bundle("fr", FR),
+            ko_kr: bundle("ko-KR", KO_KR),
         }
     }
     fn for_language(&self, language: Language) -> &FluentBundle<FluentResource> {
@@ -264,6 +273,7 @@ impl Catalogs {
             Language::Japanese => &self.ja,
             Language::German => &self.de,
             Language::French => &self.fr,
+            Language::Korean => &self.ko_kr,
             _ => &self.en,
         }
     }
@@ -283,28 +293,29 @@ impl Catalogs {
 
 thread_local! { static CATALOGS: RefCell<Catalogs> = RefCell::new(Catalogs::new()); }
 
-static LABELS: LazyLock<HashMap<String, [&'static str; 9]>> = LazyLock::new(|| {
-    let catalogs = Catalogs::new();
-    let mut labels = HashMap::new();
-    for line in EN
-        .lines()
-        .filter(|line| !line.starts_with([' ', '#']) && line.contains(" = "))
-    {
-        let key = line.split(" = ").next().unwrap();
-        if catalogs.resolve(Language::English, key, None).is_some() {
-            let values = Language::SUPPORTED.map(|language| {
-                Box::leak(
-                    catalogs
-                        .resolve(language, key, None)
-                        .expect("English fallback")
-                        .into_boxed_str(),
-                ) as &'static str
-            });
-            labels.insert(key.to_owned(), values);
+static LABELS: LazyLock<HashMap<String, [&'static str; Language::SUPPORTED.len()]>> =
+    LazyLock::new(|| {
+        let catalogs = Catalogs::new();
+        let mut labels = HashMap::new();
+        for line in EN
+            .lines()
+            .filter(|line| !line.starts_with([' ', '#']) && line.contains(" = "))
+        {
+            let key = line.split(" = ").next().unwrap();
+            if catalogs.resolve(Language::English, key, None).is_some() {
+                let values = Language::SUPPORTED.map(|language| {
+                    Box::leak(
+                        catalogs
+                            .resolve(language, key, None)
+                            .expect("English fallback")
+                            .into_boxed_str(),
+                    ) as &'static str
+                });
+                labels.insert(key.to_owned(), values);
+            }
         }
-    }
-    labels
-});
+        labels
+    });
 
 /// Resolve a static label with English fallback. Keys are checked in tests.
 pub fn tr(key: &'static str) -> &'static str {
@@ -358,6 +369,7 @@ fn month_day_in(language: Language, date: impl chrono::Datelike) -> String {
         Language::Russian | Language::French => format!("{} {month}", date.day()),
         Language::German => format!("{}. {month}", date.day()),
         Language::BrazilianPortuguese | Language::Spanish => format!("{} de {month}", date.day()),
+        Language::Korean => format!("{month} {}일", date.day()),
         Language::SimplifiedChinese | Language::TraditionalChinese | Language::Japanese => {
             format!("{month}{}日", date.day())
         }
@@ -375,6 +387,7 @@ pub fn date_with_year(date: impl chrono::Datelike + Copy) -> String {
 
 fn date_with_year_in(language: Language, date: impl chrono::Datelike + Copy) -> String {
     match language {
+        Language::Korean => format!("{}년 {}", date.year(), month_day_in(language, date)),
         Language::SimplifiedChinese | Language::TraditionalChinese | Language::Japanese => {
             format!("{}年{}", date.year(), month_day_in(language, date))
         }
@@ -494,6 +507,7 @@ mod tests {
             (Language::Japanese, JA),
             (Language::German, DE),
             (Language::French, FR),
+            (Language::Korean, KO_KR),
         ] {
             assert_eq!(
                 en,
@@ -635,6 +649,7 @@ mod tests {
             ja: bundle("ja", "empty = { \"\" }\nbad = Hello { $unknown }\n"),
             de: bundle("de", "empty = { \"\" }\nbad = Hello { $unknown }\n"),
             fr: bundle("fr", "empty = { \"\" }\nbad = Hello { $unknown }\n"),
+            ko_kr: bundle("ko-KR", "empty = { \"\" }\nbad = Hello { $unknown }\n"),
         };
         let mut args = FluentArgs::new();
         args.set("name", "Ada");
@@ -681,6 +696,8 @@ mod tests {
         }
         assert_eq!(language_from_windows_langid(0x0409), Language::English);
         assert_eq!(language_from_windows_langid(0x0411), Language::Japanese);
+        assert_eq!(language_from_windows_langid(0x0412), Language::Korean);
+        assert_eq!(language_from_windows_langid(0x0012), Language::Korean);
     }
 
     #[test]
@@ -705,7 +722,11 @@ mod tests {
             ("de_AT.UTF-8", Language::German),
             ("fr-FR", Language::French),
             ("fr_CA.UTF-8", Language::French),
-            ("ko-KR", Language::English),
+            ("ko-KR", Language::Korean),
+            ("ko_KR.UTF-8", Language::Korean),
+            ("KO", Language::Korean),
+            ("ko-KP", Language::Korean),
+            ("it-IT", Language::English),
             ("C", Language::English),
             ("", Language::English),
         ] {
@@ -729,6 +750,7 @@ mod tests {
             (Language::SimplifiedChinese, "设置", "Codex Minibar 设置"),
             (Language::TraditionalChinese, "設定", "Codex Minibar 設定"),
             (Language::Japanese, "設定", "Codex Minibar の設定"),
+            (Language::Korean, "설정", "Codex Minibar 설정"),
             (
                 Language::German,
                 "Einstellungen",
@@ -750,6 +772,12 @@ mod tests {
     #[test]
     fn new_locales_pluralize_numeric_string_parameters_and_preserve_account_data() {
         for (language, one, two, deleted) in [
+            (
+                Language::Korean,
+                "API 키 1개",
+                "API 키 2개",
+                "Settings 삭제됨.",
+            ),
             (
                 Language::BrazilianPortuguese,
                 "1 chave de API",
@@ -814,6 +842,7 @@ mod tests {
             (Language::Japanese, "0 件のリクエスト"),
             (Language::German, "0 Anfragen"),
             (Language::French, "0 requête"),
+            (Language::Korean, "요청 0건"),
         ] {
             assert_eq!(format_in(language, "requests", &[("v0", "0".into())]), zero);
         }
@@ -832,6 +861,7 @@ mod tests {
             (Language::Japanese, "2026年10月8日"),
             (Language::German, "8. Okt. 2026"),
             (Language::French, "8 oct. 2026"),
+            (Language::Korean, "2026년 10월 8일"),
         ] {
             assert_eq!(date_with_year_in(language, date), expected);
         }
@@ -877,5 +907,42 @@ mod tests {
                 format!("2026年{month}月8日")
             );
         }
+    }
+
+    #[test]
+    fn korean_dates_and_counts_preserve_parameters() {
+        for month in 1..=12 {
+            let date = chrono::NaiveDate::from_ymd_opt(2026, month, 8).unwrap();
+            assert_eq!(
+                date_with_year_in(Language::Korean, date),
+                format!("2026년 {month}월 8일")
+            );
+        }
+        for number in [0, 1, 2, 5, 21, 1_000_000] {
+            assert_eq!(
+                format_in(Language::Korean, "requests", &[("v0", number.to_string())]),
+                format!("요청 {number}건")
+            );
+            assert_eq!(
+                format_in(
+                    Language::Korean,
+                    "name-login-expires-in-days-left",
+                    &[
+                        ("name", "Work / 작업".into()),
+                        ("days_left", number.to_string())
+                    ]
+                ),
+                format!("Work / 작업 로그인은 {number}일 후 만료됩니다")
+            );
+        }
+        assert_eq!(Language::labels()[Language::Korean.index()], "한국어");
+        assert!(
+            toml::to_string(&crate::settings::Settings {
+                language: Language::Korean,
+                ..Default::default()
+            })
+            .unwrap()
+            .contains("language = \"korean\"")
+        );
     }
 }

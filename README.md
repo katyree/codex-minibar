@@ -85,7 +85,7 @@ Pick an accent color, a font and an independent popup border. Auto follows the W
 
 ### Nine languages
 
-English, Русский, Deutsch, Français, Español, Português (Brasil), 日本語, 简体中文 and 繁體中文.
+English, Русский, Deutsch, Français, Español, Português (Brasil), 日本語, 简体中文, 繁體中文 and 한국어.
 Auto follows the Windows display language, including Traditional Chinese in Taiwan,
 Hong Kong and Macao.
 
