@@ -417,6 +417,7 @@ fn observations_from_summary(value: &Value) -> Vec<QuotaObservation> {
                 .and_then(Value::as_array)
                 .into_iter()
                 .flatten()
+                .filter(|bucket| bucket.get("disabled").and_then(Value::as_bool) != Some(true))
                 .map(move |bucket| {
                     let id = bucket
                         .get("bucketId")
@@ -612,6 +613,52 @@ mod tests {
             limits.secondary.resets_at,
             parse_timestamp("2026-10-21T06:00:00Z")
         );
+    }
+
+    #[test]
+    fn disabled_session_buckets_do_not_override_enabled_weekly_allowances() {
+        let mut summary = quota_summary();
+        for group in summary["groups"].as_array_mut().unwrap() {
+            group["buckets"][0]["disabled"] = json!(false);
+            group["buckets"][1]["disabled"] = json!(true);
+            group["buckets"][1]["remainingFraction"] = json!(0.5);
+        }
+        let limits = limits_from_summary(&summary, None).unwrap();
+        assert_eq!(limits.primary.used_percent, Some(3));
+        assert_eq!(limits.primary.duration_minutes, Some(10_080));
+        assert_eq!(
+            limits.primary.resets_at,
+            parse_timestamp("2026-10-27T14:58:17Z")
+        );
+        assert_eq!(limits.secondary.used_percent, Some(20));
+        assert_eq!(limits.secondary.duration_minutes, Some(10_080));
+        assert_eq!(
+            limits.secondary.resets_at,
+            parse_timestamp("2026-10-28T01:59:37Z")
+        );
+    }
+
+    #[test]
+    fn disabled_only_families_remain_unavailable() {
+        for disabled_group in [0, 1] {
+            let mut summary = quota_summary();
+            for bucket in summary["groups"][disabled_group]["buckets"]
+                .as_array_mut()
+                .unwrap()
+            {
+                bucket["disabled"] = json!(true);
+            }
+            let limits = limits_from_summary(&summary, None).unwrap();
+            assert_eq!(limits.primary.is_empty(), disabled_group == 0);
+            assert_eq!(limits.secondary.is_empty(), disabled_group == 1);
+
+            for group in summary["groups"].as_array_mut().unwrap() {
+                for bucket in group["buckets"].as_array_mut().unwrap() {
+                    bucket["disabled"] = json!(true);
+                }
+            }
+            assert!(limits_from_summary(&summary, None).is_err());
+        }
     }
 
     #[test]
