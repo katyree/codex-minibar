@@ -1,7 +1,6 @@
 //! Antigravity subscription quota using the official `agy` Windows session.
 
 use std::{
-    collections::HashMap,
     env,
     path::{Path, PathBuf},
     time::Duration,
@@ -22,6 +21,10 @@ use crate::{
 const CREDENTIAL_TARGET: &str = "gemini:antigravity";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 const API_BASE: &str = "https://cloudcode-pa.googleapis.com";
+const QUOTA_API_BASE: &str = "https://daily-cloudcode-pa.googleapis.com";
+// The generic client identity returns model availability, including synthetic
+// full quotas. The Hub client family exposes Antigravity subscription usage.
+const USER_AGENT: &str = "antigravity/hub/2.9.1 windows/amd64";
 const CLI_NAMES: &[&str] = &["agy.exe", "agy.cmd", "agy.ps1", "agy.bat"];
 
 pub struct AntigravityClient {
@@ -64,7 +67,7 @@ impl Default for AntigravityClient {
 impl LimitProvider for AntigravityClient {
     fn read_limits(&mut self) -> Result<RateLimits> {
         let session = self.fresh_session()?;
-        read_remote_limits(&self.agent, API_BASE, &session.access_token)
+        read_remote_limits(&self.agent, API_BASE, QUOTA_API_BASE, &session.access_token)
     }
 }
 
@@ -231,10 +234,7 @@ fn decode_credential_text(blob: &[u8]) -> Result<String> {
 
 fn parse_expiry(value: &Value) -> Option<DateTime<Utc>> {
     if let Some(value) = value.as_str() {
-        if let Some(parsed) = DateTime::parse_from_rfc3339(value)
-            .ok()
-            .map(|value| value.with_timezone(&Utc))
-        {
+        if let Some(parsed) = parse_timestamp(value) {
             return Some(parsed);
         }
         if let Ok(numeric) = value.parse::<i64>() {
@@ -291,9 +291,15 @@ struct QuotaObservation {
     label: String,
     remaining_fraction: Option<f64>,
     reset_time: Option<DateTime<Utc>>,
+    duration_minutes: Option<u32>,
 }
 
-fn read_remote_limits(agent: &ureq::Agent, base: &str, access_token: &str) -> Result<RateLimits> {
+fn read_remote_limits(
+    agent: &ureq::Agent,
+    base: &str,
+    quota_base: &str,
+    access_token: &str,
+) -> Result<RateLimits> {
     let metadata = json!({
         "metadata": {
             "ideType": "ANTIGRAVITY",
@@ -303,33 +309,37 @@ fn read_remote_limits(agent: &ureq::Agent, base: &str, access_token: &str) -> Re
     });
     let code_assist = post_json(agent, base, "loadCodeAssist", access_token, &metadata)?;
     let project = project_id(&code_assist);
-    let request = project.map_or_else(|| json!({}), |project| json!({ "project": project }));
-    let available = post_json(agent, base, "fetchAvailableModels", access_token, &request)?;
-    let model_labels = available
-        .get("models")
-        .and_then(Value::as_object)
-        .map(|models| {
-            models
-                .iter()
-                .map(|(id, model)| {
-                    let label = model
-                        .get("displayName")
-                        .or_else(|| model.get("label"))
-                        .and_then(Value::as_str)
-                        .unwrap_or(id)
-                        .to_owned();
-                    (id.to_owned(), label)
+    if project.is_none()
+        && code_assist.get("currentTier").is_none_or(Value::is_null)
+        && code_assist
+            .get("ineligibleTiers")
+            .and_then(Value::as_array)
+            .is_some_and(|tiers| {
+                tiers.iter().any(|tier| {
+                    tier.get("reasonCode").and_then(Value::as_str)
+                        == Some("GOOGLE_TOS_NOT_SUPPORTED_BY_CLIENT")
                 })
-                .collect::<HashMap<_, _>>()
-        })
-        .unwrap_or_default();
-    let available_observations = observations_from_models(&available);
-    let verified = match post_json(agent, base, "retrieveUserQuota", access_token, &request) {
-        Ok(value) => observations_from_buckets(&value, &model_labels),
-        Err(error) if crate::worker::is_rate_limited_error(&error) => return Err(error),
-        Err(_) => Vec::new(),
-    };
-    let observations = choose_observations(verified, available_observations)?;
+            })
+    {
+        bail!("Antigravity session cannot read subscription quota; run `agy` and sign in again")
+    }
+    let request = project.map_or_else(|| json!({}), |project| json!({ "project": project }));
+    // Both legacy model endpoints can agree on placeholder 100%-remaining
+    // values, even when the account has consumed its weekly allowance.
+    let summary = post_json(
+        agent,
+        quota_base,
+        "retrieveUserQuotaSummary",
+        access_token,
+        &request,
+    )?;
+    limits_from_summary(&summary, plan_name(&code_assist))
+}
+
+fn limits_from_summary(summary: &Value, plan_type: Option<String>) -> Result<RateLimits> {
+    let observations = observations_from_summary(summary);
+    // Keep the existing family metrics (including saved tray selections), but
+    // let either the session or weekly allowance drive each family's usage.
     let gemini = select_family(&observations, Family::Gemini);
     let third_party = select_family(&observations, Family::ThirdParty);
     if gemini.is_none() && third_party.is_none() {
@@ -339,30 +349,11 @@ fn read_remote_limits(agent: &ureq::Agent, base: &str, access_token: &str) -> Re
         primary: gemini.map(limit_window).unwrap_or_default(),
         secondary: third_party.map(limit_window).unwrap_or_default(),
         sampled_at: Utc::now(),
-        plan_type: plan_name(&code_assist),
+        plan_type,
         limit_name: Some("Gemini".into()),
         secondary_limit_name: Some("Claude + GPT".into()),
         ..RateLimits::default()
     })
-}
-
-fn choose_observations(
-    verified: Vec<QuotaObservation>,
-    available: Vec<QuotaObservation>,
-) -> Result<Vec<QuotaObservation>> {
-    if verified
-        .iter()
-        .any(|item| item.remaining_fraction.is_some())
-    {
-        return Ok(verified);
-    }
-    if available.iter().any(|item| {
-        item.remaining_fraction
-            .is_some_and(|remaining| remaining < 0.999)
-    }) {
-        return Ok(available);
-    }
-    bail!("Antigravity limits are not available for this account")
 }
 
 fn project_id(value: &Value) -> Option<&str> {
@@ -387,7 +378,7 @@ fn post_json(
         .set("Authorization", &format!("Bearer {access_token}"))
         .set("Content-Type", "application/json")
         .set("Accept", "application/json")
-        .set("User-Agent", "antigravity")
+        .set("User-Agent", USER_AGENT)
         .send_string(&body.to_string())
     {
         Ok(response) => response,
@@ -413,52 +404,49 @@ fn post_json(
     serde_json::from_str(&body).context("parse Antigravity subscription quota response")
 }
 
-fn observations_from_models(value: &Value) -> Vec<QuotaObservation> {
-    value
-        .get("models")
-        .and_then(Value::as_object)
-        .into_iter()
-        .flatten()
-        .filter_map(|(id, model)| {
-            let quota = model.get("quotaInfo")?;
-            Some(QuotaObservation {
-                id: id.to_owned(),
-                label: model
-                    .get("displayName")
-                    .or_else(|| model.get("label"))
-                    .and_then(Value::as_str)
-                    .unwrap_or(id)
-                    .to_owned(),
-                remaining_fraction: quota.get("remainingFraction").and_then(Value::as_f64),
-                reset_time: quota
-                    .get("resetTime")
-                    .and_then(Value::as_str)
-                    .and_then(parse_timestamp),
-            })
-        })
-        .collect()
-}
-
-fn observations_from_buckets(
-    value: &Value,
-    model_labels: &HashMap<String, String>,
-) -> Vec<QuotaObservation> {
-    value
-        .get("buckets")
+fn observations_from_summary(value: &Value) -> Vec<QuotaObservation> {
+    let summary = value.get("response").unwrap_or(value);
+    summary
+        .get("groups")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .filter_map(|bucket| {
-            let id = bucket.get("modelId")?.as_str()?.to_owned();
-            Some(QuotaObservation {
-                label: model_labels.get(&id).cloned().unwrap_or_else(|| id.clone()),
-                id,
-                remaining_fraction: bucket.get("remainingFraction").and_then(Value::as_f64),
-                reset_time: bucket
-                    .get("resetTime")
-                    .and_then(Value::as_str)
-                    .and_then(parse_timestamp),
-            })
+        .flat_map(|group| {
+            group
+                .get("buckets")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .map(move |bucket| {
+                    let id = bucket
+                        .get("bucketId")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
+                    let cadence = bucket.get("window").and_then(Value::as_str);
+                    QuotaObservation {
+                        id: id.to_owned(),
+                        label: group
+                            .get("displayName")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_owned(),
+                        remaining_fraction: bucket
+                            .get("remainingFraction")
+                            .or_else(|| bucket.pointer("/remaining/remainingFraction"))
+                            .and_then(Value::as_f64)
+                            .filter(|fraction| {
+                                fraction.is_finite() && (0.0..=1.0).contains(fraction)
+                            }),
+                        reset_time: bucket.get("resetTime").and_then(parse_expiry),
+                        duration_minutes: match cadence {
+                            Some("5h") => Some(300),
+                            Some("weekly") => Some(10_080),
+                            None if id.ends_with("-5h") => Some(300),
+                            None if id.ends_with("-weekly") => Some(10_080),
+                            _ => None,
+                        },
+                    }
+                })
         })
         .collect()
 }
@@ -477,7 +465,8 @@ fn select_family(items: &[QuotaObservation], family: Family) -> Option<QuotaObse
             match family {
                 Family::Gemini => identity.contains("gemini"),
                 Family::ThirdParty => {
-                    identity.contains("claude")
+                    item.id.starts_with("3p-")
+                        || identity.contains("claude")
                         || identity.contains("gpt")
                         || identity.contains("oss")
                 }
@@ -488,6 +477,11 @@ fn select_family(items: &[QuotaObservation], family: Family) -> Option<QuotaObse
             left.remaining_fraction
                 .partial_cmp(&right.remaining_fraction)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    left.duration_minutes
+                        .unwrap_or(u32::MAX)
+                        .cmp(&right.duration_minutes.unwrap_or(u32::MAX))
+                })
         })
         .cloned()
 }
@@ -499,14 +493,14 @@ fn limit_window(item: QuotaObservation) -> LimitWindow {
             .filter(|value| value.is_finite())
             .map(|remaining| ((1.0 - remaining.clamp(0.0, 1.0)) * 100.0).round() as u8),
         resets_at: item.reset_time,
-        duration_minutes: None,
+        duration_minutes: item.duration_minutes,
     }
 }
 
 fn plan_name(value: &Value) -> Option<String> {
     [
-        value.pointer("/planInfo/planType"),
         value.pointer("/paidTier/name"),
+        value.pointer("/planInfo/planType"),
         value.pointer("/currentTier/name"),
     ]
     .into_iter()
@@ -525,6 +519,8 @@ fn parse_timestamp(value: &str) -> Option<DateTime<Utc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    type RecordedRequests = Vec<(String, Value)>;
 
     #[test]
     fn parses_go_keyring_credential_wrapper() {
@@ -602,29 +598,262 @@ mod tests {
     }
 
     #[test]
-    fn selects_the_most_constrained_quota_in_each_real_pool() {
-        let observations = observations_from_models(&json!({
-            "models": {
-                "gemini-fast": {"displayName":"Gemini Flash", "quotaInfo":{"remainingFraction":0.8,"resetTime":"2026-09-14T00:00:00Z"}},
-                "gemini-pro": {"displayName":"Gemini Pro", "quotaInfo":{"remainingFraction":0.4,"resetTime":"2026-09-15T00:00:00Z"}},
-                "claude": {"displayName":"Claude Sonnet", "quotaInfo":{"remainingFraction":0.6,"resetTime":"2026-09-16T00:00:00Z"}}
-            }
-        }));
-        let gemini = select_family(&observations, Family::Gemini).unwrap();
-        let third_party = select_family(&observations, Family::ThirdParty).unwrap();
-        assert_eq!(gemini.id, "gemini-pro");
-        assert_eq!(limit_window(gemini).used_percent, Some(60));
-        assert_eq!(third_party.id, "claude");
+    fn weekly_consumption_is_not_hidden_by_an_unused_session() {
+        let limits = limits_from_summary(&quota_summary(), None).unwrap();
+        assert_eq!(limits.primary.used_percent, Some(3));
+        assert_eq!(limits.primary.duration_minutes, Some(10_080));
+        assert_eq!(
+            limits.primary.resets_at,
+            parse_timestamp("2026-10-27T14:58:17Z")
+        );
+        assert_eq!(limits.secondary.used_percent, Some(60));
+        assert_eq!(limits.secondary.duration_minutes, Some(300));
+        assert_eq!(
+            limits.secondary.resets_at,
+            parse_timestamp("2026-10-21T06:00:00Z")
+        );
     }
 
     #[test]
-    fn all_available_placeholders_are_not_reported_as_quota() {
-        let observations = observations_from_models(&json!({
-            "models": {
-                "gemini-pro": {"quotaInfo":{"remainingFraction":1.0}}
+    fn legacy_model_availability_is_not_reported_as_subscription_usage() {
+        for legacy in [
+            json!({
+                "models": {
+                    "gemini-pro": {"quotaInfo":{"remainingFraction":1.0}}
+                }
+            }),
+            json!({
+                "buckets": [{"modelId":"gemini-pro","remainingFraction":1.0}]
+            }),
+        ] {
+            assert!(limits_from_summary(&legacy, None).is_err());
+        }
+    }
+
+    #[test]
+    fn real_unused_and_exhausted_summary_buckets_are_valid() {
+        let mut summary = quota_summary();
+        for remaining in [0.0, 1.0] {
+            for group in summary["groups"].as_array_mut().unwrap() {
+                for bucket in group["buckets"].as_array_mut().unwrap() {
+                    bucket["remainingFraction"] = json!(remaining);
+                }
             }
-        }));
-        assert!(choose_observations(Vec::new(), observations).is_err());
+            let limits = limits_from_summary(&summary, None).unwrap();
+            let expected = if remaining == 0.0 { Some(100) } else { Some(0) };
+            assert_eq!(limits.primary.used_percent, expected);
+            assert_eq!(limits.secondary.used_percent, expected);
+        }
+    }
+
+    #[test]
+    fn family_and_equal_usage_selection_do_not_depend_on_response_order() {
+        let mut summary = quota_summary();
+        for group in summary["groups"].as_array_mut().unwrap() {
+            for bucket in group["buckets"].as_array_mut().unwrap() {
+                bucket["remainingFraction"] = json!(0.5);
+            }
+        }
+        for reverse in [false, true] {
+            if reverse {
+                let groups = summary["groups"].as_array_mut().unwrap();
+                groups.reverse();
+                for group in groups {
+                    group["buckets"].as_array_mut().unwrap().reverse();
+                }
+            }
+            let limits = limits_from_summary(&summary, None).unwrap();
+            assert_eq!(limits.primary.duration_minutes, Some(300));
+            assert_eq!(limits.secondary.duration_minutes, Some(300));
+            assert_eq!(
+                limits.primary.resets_at,
+                parse_timestamp("2026-10-21T06:59:37Z")
+            );
+            assert_eq!(
+                limits.secondary.resets_at,
+                parse_timestamp("2026-10-21T06:00:00Z")
+            );
+        }
+    }
+
+    #[test]
+    fn missing_or_invalid_fractions_do_not_become_zero_usage() {
+        for fraction in [Value::Null, json!("1"), json!(-0.1), json!(1.1)] {
+            let summary = json!({"groups":[{
+                "displayName":"Gemini Models",
+                "buckets":[{"bucketId":"gemini-weekly","remainingFraction":fraction}]
+            }]});
+            assert!(limits_from_summary(&summary, None).is_err());
+        }
+        let summary = json!({"groups":[{
+            "displayName":"Gemini Models",
+            "buckets":[{"bucketId":"gemini-weekly","remainingFraction":0.7}]
+        }]});
+        let limits = limits_from_summary(&summary, None).unwrap();
+        assert_eq!(limits.primary.used_percent, Some(30));
+        assert!(limits.secondary.is_empty());
+    }
+
+    #[test]
+    fn parses_nested_summary_and_does_not_borrow_another_familys_quota() {
+        let summary = json!({"response":{"groups":[{
+            "displayName":"Claude and GPT models",
+            "buckets":[{
+                "bucketId":"3p-weekly",
+                "remaining":{"remainingFraction":0.25},
+                "resetTime":1_800_000_000
+            }]
+        }]}});
+        let limits = limits_from_summary(&summary, None).unwrap();
+        assert!(limits.primary.is_empty());
+        assert_eq!(limits.secondary.used_percent, Some(75));
+        assert_eq!(limits.secondary.duration_minutes, Some(10_080));
+        assert_eq!(
+            limits.secondary.resets_at,
+            DateTime::from_timestamp(1_800_000_000, 0)
+        );
+    }
+
+    fn quota_summary() -> Value {
+        // Sanitized wire shape observed from retrieveUserQuotaSummary. Legacy
+        // retrieveUserQuota returned 1.0 for every model for the same account.
+        json!({"groups":[
+            {"displayName":"Gemini Models","buckets":[
+                {"bucketId":"gemini-weekly","window":"weekly","remainingFraction":0.97032213,"resetTime":"2026-10-27T14:58:17Z"},
+                {"bucketId":"gemini-5h","window":"5h","remainingFraction":1.0,"resetTime":"2026-10-21T06:59:37Z"}
+            ]},
+            {"displayName":"Claude and GPT models","buckets":[
+                {"bucketId":"3p-weekly","window":"weekly","remainingFraction":0.8,"resetTime":"2026-10-28T01:59:37Z"},
+                {"bucketId":"3p-5h","window":"5h","remainingFraction":0.4,"resetTime":"2026-10-21T06:00:00Z"}
+            ]}
+        ]})
+    }
+
+    #[test]
+    fn remote_requests_use_hub_identity_project_and_subscription_summary() {
+        let assist = json!({
+            "cloudaicompanionProject":{"id":"test-project"},
+            "currentTier":{"name":"Antigravity"},
+            "planInfo":{"planType":"Free"},
+            "paidTier":{"name":"Google AI Pro"}
+        });
+        let (base, peer) = mock_api(vec![(200, assist), (200, quota_summary())]);
+        let agent = ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(5))
+            .build();
+        let limits = read_remote_limits(&agent, &base, &base, "test-token").unwrap();
+        let requests = peer.join().unwrap();
+        assert_eq!(requests.len(), 2);
+        for (headers, _) in &requests {
+            let headers = headers.to_ascii_lowercase();
+            assert!(headers.contains("user-agent: antigravity/hub/2.9.1 windows/amd64"));
+            assert!(headers.contains("authorization: bearer test-token"));
+        }
+        assert!(
+            requests[0]
+                .0
+                .starts_with("POST /v1internal:loadCodeAssist ")
+        );
+        assert_eq!(requests[0].1["metadata"]["ideType"], "ANTIGRAVITY");
+        assert!(
+            requests[1]
+                .0
+                .starts_with("POST /v1internal:retrieveUserQuotaSummary ")
+        );
+        assert_eq!(requests[1].1, json!({"project":"test-project"}));
+        assert_eq!(limits.plan_type.as_deref(), Some("Google AI Pro"));
+        assert_eq!(limits.primary.used_percent, Some(3));
+        assert_eq!(limits.limit_name.as_deref(), Some("Gemini"));
+        assert_eq!(limits.secondary_limit_name.as_deref(), Some("Claude + GPT"));
+    }
+
+    #[test]
+    fn summary_errors_propagate_without_falling_back_to_availability() {
+        for status in [401, 403, 429, 500] {
+            let (base, peer) = mock_api(vec![
+                (200, json!({"cloudaicompanionProject":"test-project"})),
+                (status, json!({})),
+            ]);
+            let agent = ureq::AgentBuilder::new()
+                .timeout(Duration::from_secs(5))
+                .build();
+            let error = read_remote_limits(&agent, &base, &base, "test-token").unwrap_err();
+            assert_eq!(crate::worker::is_rate_limited_error(&error), status == 429);
+            assert_eq!(peer.join().unwrap().len(), 2);
+        }
+    }
+
+    #[test]
+    fn incompatible_oauth_client_does_not_accept_placeholder_summary() {
+        let (base, peer) = mock_api(vec![(
+            200,
+            json!({
+                "ineligibleTiers":[{"reasonCode":"GOOGLE_TOS_NOT_SUPPORTED_BY_CLIENT"}]
+            }),
+        )]);
+        let agent = ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(5))
+            .build();
+        let error = read_remote_limits(&agent, &base, &base, "test-token").unwrap_err();
+        assert!(error.to_string().contains("run `agy` and sign in again"));
+        assert_eq!(peer.join().unwrap().len(), 1);
+    }
+
+    fn mock_api(
+        responses: Vec<(u16, Value)>,
+    ) -> (String, std::thread::JoinHandle<RecordedRequests>) {
+        use std::io::{BufRead, BufReader, Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        listener.set_nonblocking(true).unwrap();
+        let peer = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            for (status, response) in responses {
+                let deadline = std::time::Instant::now() + Duration::from_secs(5);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(
+                                std::time::Instant::now() < deadline,
+                                "quota request timed out"
+                            );
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(error) => panic!("accept quota request: {error}"),
+                    }
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut headers = String::new();
+                loop {
+                    let mut line = String::new();
+                    assert!(reader.read_line(&mut line).unwrap() > 0);
+                    if line == "\r\n" {
+                        break;
+                    }
+                    headers.push_str(&line);
+                }
+                let length = headers
+                    .lines()
+                    .find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("content-length: ")
+                            .map(|length| length.parse::<usize>().unwrap())
+                    })
+                    .unwrap();
+                let mut body = vec![0; length];
+                reader.read_exact(&mut body).unwrap();
+                requests.push((headers, serde_json::from_slice(&body).unwrap()));
+                let response = response.to_string();
+                write!(stream, "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", response.len()).unwrap();
+            }
+            requests
+        });
+        (base, peer)
     }
 
     #[test]
