@@ -186,7 +186,7 @@
       return choices;
     }
     // Rebuilding only on change keeps an open dropdown usable while the
-    // catalog refreshes every two seconds.
+    // catalog refreshes every 30 seconds.
     function fillOptions(select, choices) {
       const signature = JSON.stringify(choices);
       if (select.dataset.signature === signature) return;
@@ -377,7 +377,7 @@
       });
       render();
     };
-    setInterval(requestCatalog, 2000);
+    setInterval(requestCatalog, 30_000);
     render();
   </script>
 </body>

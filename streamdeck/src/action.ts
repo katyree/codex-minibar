@@ -39,6 +39,8 @@ type PendingPress = {
 };
 
 const REFRESH_HOLD_MS = 700;
+const SNAPSHOT_POLL_MS = 30_000;
+const SNAPSHOT_CACHE_MS = 60_000;
 
 const bridge = new MinibarBridge();
 const bindings = new Map<string, Binding>();
@@ -46,8 +48,14 @@ const pendingPresses = new Map<string, PendingPress>();
 const previousWindows = new Map<string, LimitWindow[]>();
 const bursts = new Map<string, { startedAt: number; timer: NodeJS.Timeout }>();
 let latestSnapshot: SnapshotResponse | null = null;
+let snapshotReceivedAt = 0;
+let lastSnapshotAttemptAt = -Infinity;
 let refreshInFlight = false;
 let refreshTimer: NodeJS.Timeout | undefined;
+
+function hasCachedSnapshot(): boolean {
+  return latestSnapshot !== null && Date.now() - snapshotReceivedAt < SNAPSHOT_CACHE_MS;
+}
 
 function providerFor(settings: ActionSettings): SnapshotResponse["providers"][number] | null {
   return selectedProvider(latestSnapshot, settings);
@@ -61,7 +69,7 @@ function stopBurst(id: string): void {
 }
 
 async function paint(binding: Binding, connected: boolean): Promise<void> {
-  await binding.action.setImage(renderIndicator(latestSnapshot, binding.settings, connected), {
+  await binding.action.setImage(renderIndicator(latestSnapshot, binding.settings, connected && hasCachedSnapshot()), {
     target: Target.HardwareAndSoftware,
   });
   await binding.action.setTitle("");
@@ -115,11 +123,21 @@ async function refresh(): Promise<void> {
   if (refreshInFlight || bindings.size === 0) return;
   refreshInFlight = true;
   try {
-    latestSnapshot = await bridge.snapshot();
-    await Promise.all([...bindings.values()].map(binding => applySnapshot(binding, true)));
+    if (Date.now() - lastSnapshotAttemptAt >= SNAPSHOT_POLL_MS) {
+      lastSnapshotAttemptAt = Date.now();
+      try {
+        latestSnapshot = await bridge.snapshot();
+        snapshotReceivedAt = Date.now();
+      } catch (error) {
+        if (!(error instanceof BridgeUnavailableError)) streamDeck.logger.error(String(error));
+        // Keep the last successful snapshot through brief bridge outages.
+      }
+    }
+    const connected = hasCachedSnapshot();
+    if (!connected) latestSnapshot = null;
+    await Promise.all([...bindings.values()].map(binding => applySnapshot(binding, connected)));
   } catch (error) {
-    if (!(error instanceof BridgeUnavailableError)) streamDeck.logger.error(String(error));
-    await Promise.all([...bindings.values()].map(binding => applySnapshot(binding, false)));
+    streamDeck.logger.error(String(error));
   } finally {
     refreshInFlight = false;
   }
@@ -127,6 +145,7 @@ async function refresh(): Promise<void> {
 
 function ensureRefreshLoop(): void {
   if (refreshTimer) return;
+  // Repaint countdowns locally each second; only poll the bridge every 30 seconds.
   refreshTimer = setInterval(() => void refresh(), 1000);
 }
 

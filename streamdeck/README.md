@@ -4,6 +4,12 @@ This is a thin Stream Deck plugin. It stores each key's configuration in the
 Stream Deck Property Inspector and reads sanitized quota snapshots from the
 running Codex Minibar process over loopback.
 
+All visible keys share one snapshot request every 30 seconds. The plugin keeps
+the last successful snapshot in memory for up to 60 seconds, so a brief bridge
+outage does not blank the keys. Countdowns still repaint locally every second.
+With no visible keys, snapshot polling pauses. The Property Inspector requests
+the provider catalog on opening and every 30 seconds while open.
+
 Each key selects one provider instance. The Property Inspector lists the
 enabled instances reported by Minibar (plus any instance a key already
 references, marked disabled or unavailable); while Minibar is not running it
