@@ -430,6 +430,7 @@ pub(crate) struct UiState {
     pub(super) total_spend_period: TotalSpendPeriod,
     pub(super) show_account_name: bool,
     pub(super) show_edit_home_button: bool,
+    pub(super) popup_pinned: bool,
     /// Every configured instance in display order, enabled or not.
     pub(super) instances: Vec<ProviderInstance>,
     pub(super) popup_tab_mode: PopupTabMode,
@@ -481,6 +482,7 @@ impl Default for UiState {
             total_spend_period: TotalSpendPeriod::default(),
             show_account_name: false,
             show_edit_home_button: true,
+            popup_pinned: false,
             instances: Settings::default().instances,
             popup_tab_mode: PopupTabMode::default(),
             grouped_tab_selection: Default::default(),
@@ -539,6 +541,7 @@ impl UiState {
         self.total_spend_period = settings.total_spend_period;
         self.show_account_name = settings.show_account_name;
         self.show_edit_home_button = settings.show_edit_home_button;
+        self.popup_pinned = settings.popup_pinned;
         self.instances = settings.instances.clone();
         self.popup_tab_mode = settings.popup_tab_mode;
         self.grouped_tab_selection = settings.grouped_tab_selection.clone();

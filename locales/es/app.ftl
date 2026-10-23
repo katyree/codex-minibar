@@ -197,6 +197,10 @@ updated = Actualizado{ " " }
 
 refresh-last-updated-relative = Actualizar · Última actualización { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = Mantener abierto
+popup-unpin = Cerrar al hacer clic fuera
+
 edit-home = Editar inicio
 home-card-layout = Diseño
 home-card-layout-cards = Tarjetas

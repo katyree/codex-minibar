@@ -43,8 +43,9 @@ static POPUP_CLOSING: AtomicBool = AtomicBool::new(false);
 static BUTTON_WAS_DOWN: AtomicBool = AtomicBool::new(false);
 static ESCAPE_WAS_DOWN: AtomicBool = AtomicBool::new(false);
 static IGNORE_OUTSIDE_UNTIL_MS: AtomicI64 = AtomicI64::new(0);
-/// While set, outside clicks and Escape do not dismiss the popup.
-static PINNED: AtomicBool = AtomicBool::new(false);
+/// While either is set, outside clicks and Escape do not dismiss the popup.
+static REVEAL_PINNED: AtomicBool = AtomicBool::new(false);
+static USER_PINNED: AtomicBool = AtomicBool::new(false);
 static BOTTOM_BAR_SIZE: AtomicU8 = AtomicU8::new(BottomBarSize::Comfortable.index() as u8);
 static CORNER_RADIUS_DIP: AtomicI32 = AtomicI32::new(WINDOW_CORNER_RADIUS_DIP);
 static POPUP_BACKGROUND_MATERIAL: AtomicU8 =
@@ -82,12 +83,27 @@ pub(crate) fn set_lifecycle(visible: bool, closing: bool) {
 
 /// Keep the popup open while it shows something the user must not lose,
 /// such as a newly created key that can never be shown again.
-pub(crate) fn set_pinned(pinned: bool) {
-    PINNED.store(pinned, Ordering::SeqCst);
+pub(crate) fn set_reveal_pinned(pinned: bool) {
+    REVEAL_PINNED.store(pinned, Ordering::SeqCst);
 }
 
+pub(crate) fn is_reveal_pinned() -> bool {
+    REVEAL_PINNED.load(Ordering::SeqCst)
+}
+
+/// The footer pin (persisted as `Settings::popup_pinned`): the user keeps the
+/// popup open while working elsewhere. Only tray/hotkey toggles close it.
+pub(crate) fn set_user_pinned(pinned: bool) {
+    USER_PINNED.store(pinned, Ordering::SeqCst);
+}
+
+pub(crate) fn is_user_pinned() -> bool {
+    USER_PINNED.load(Ordering::SeqCst)
+}
+
+/// Outside clicks and Escape leave the popup open.
 pub(crate) fn is_pinned() -> bool {
-    PINNED.load(Ordering::SeqCst)
+    is_reveal_pinned() || is_user_pinned()
 }
 
 /// GPUI thread only: the capsule is now visible, so the press that opened it

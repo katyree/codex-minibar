@@ -295,6 +295,10 @@ updated = Aktualisiert{ " " }
 # src/popup_window/ui/footer.rs
 refresh-last-updated-relative = Aktualisieren · Zuletzt aktualisiert: { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = Geöffnet lassen
+popup-unpin = Beim Klicken außerhalb schließen
+
 # src/popup_window/ui/home.rs
 edit-home = Startseite bearbeiten
 home-card-layout = Layout

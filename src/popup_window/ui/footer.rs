@@ -1,4 +1,4 @@
-//! Footer: page tabs on the left, refresh/settings/update on the right.
+//! Footer: page tabs on the left, pin/refresh/settings/update on the right.
 
 use std::rc::Rc;
 
@@ -147,7 +147,7 @@ impl PopupRoot {
             fx::NORMAL,
         );
         let action_count =
-            2.0 + edit_presence + f32::from(u8::from(self.ui.update_version.is_some()));
+            3.0 + edit_presence + f32::from(u8::from(self.ui.update_version.is_some()));
         let viewport_width = capsule_width
             - 2.0
             - size.tab_padding_left() as f32
@@ -253,7 +253,23 @@ impl PopupRoot {
                     ),
             );
         }
+        let pinned = self.ui.popup_pinned;
         actions = actions
+            .child(self.render_action_button(
+                "pin",
+                if pinned {
+                    "fluent-pin-filled"
+                } else {
+                    "fluent-pin"
+                },
+                crate::i18n::tr(if pinned { "popup-unpin" } else { "popup-pin" }).into(),
+                button,
+                size.icon_glyph_size() as f32,
+                pinned,
+                cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_user_pin(cx)),
+                cx,
+            ))
+            .child(div().w(px(gap)).flex_none())
             .child(self.render_refresh_button(button, size.icon_glyph_size() as f32, cx))
             .child(div().w(px(gap)).flex_none())
             .child(self.render_action_button(
