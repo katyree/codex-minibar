@@ -2947,3 +2947,6 @@ popup-position-description = The position is remembered between sessions.
 popup-reset-position = Reset position
 popup-drag-header = Drag to move
 popup-close = Close panel
+
+show-popup-action-bar = Show popup action bar
+show-popup-action-bar-description = Show the app title and action buttons in the regular popup. Floating panels always show this bar.

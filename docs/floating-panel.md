@@ -3,13 +3,19 @@
 Enable **Settings > Customize > Floating panel** to detach the popup from the
 taskbar. Enabling it also pins the panel open. Drag the dedicated header to move
 it, including across monitors. Tabs and action buttons remain interactive.
-The header shows the app logo and Codex Minibar title on the left; that area
-remains draggable.
-The header's Edit Home button opens the Home editor and becomes Done while
-editing. The bottom bar hides its Edit/Done button while the floating header is
-shown, including when editing was started from Settings.
-The pin button is in the header next to the close button in floating mode,
-and in the bottom bar in tray mode. It controls outside-click and Escape
+Both modes show a compact bar with the app logo, Codex Minibar title and action
+buttons on the same side as the tabs. It sits below the tabs for bottom-anchored
+popups and above them for top-anchored popups. Only the floating mode permits
+dragging its title area; the regular popup remains anchored to the taskbar.
+Edit Home opens the Home editor and becomes Done while editing. The Show edit
+button preference applies to this bar; Done remains available while editing.
+**Settings > Customize > Layout > Show popup action bar** hides or shows this
+bar in the regular popup only. Floating panels always keep it. The change is
+saved and animates immediately. With the bar hidden, pin and Edit/Done return
+to the tab bar; Edit follows its own visibility preference, and Done always
+remains available during editing. With the action bar visible, these controls
+are not duplicated in the tab bar.
+The pin button next to the close button controls outside-click and Escape
 dismissal. The close button hides the panel without clearing its pin or position;
 the tray icon and popup hotkey also hide or reopen it. Header buttons do not drag
 the window.

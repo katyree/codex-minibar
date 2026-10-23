@@ -2955,3 +2955,6 @@ popup-position-description = La position est conservée entre les sessions.
 popup-reset-position = Réinitialiser la position
 popup-drag-header = Faire glisser pour déplacer
 popup-close = Fermer le panneau
+
+show-popup-action-bar = Afficher la barre d’actions du panneau
+show-popup-action-bar-description = Afficher le titre et les actions dans le panneau normal. Les panneaux flottants affichent toujours cette barre.

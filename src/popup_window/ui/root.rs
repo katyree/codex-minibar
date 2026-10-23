@@ -166,7 +166,7 @@ impl Host {
             placement: super::Placement::default(),
             #[cfg(windows)]
             floating_rect: None,
-            header_height: 0.0,
+            header_height: super::footer::FLOATING_HEADER_HEIGHT,
             resizing_height: false,
             reopen_after_hide: false,
             phase: Phase::Hidden,
@@ -787,6 +787,13 @@ impl PopupRoot {
             }
         }
         let already_visible = matches!(self.host.phase, Phase::Open | Phase::Opening(_));
+        if !already_visible {
+            self.host.header_height = if self.ui.compact_bar_visible() {
+                super::footer::FLOATING_HEADER_HEIGHT
+            } else {
+                0.0
+            };
+        }
         let was_hidden = matches!(self.host.phase, Phase::Hidden | Phase::Prewarm);
         let anchor = anchor.unwrap_or_else(|| {
             let rect = super::win32::window_rect(hwnd);
@@ -1036,8 +1043,20 @@ impl PopupRoot {
             && matches!(self.host.phase, Phase::Open | Phase::Opening(_))
             && self.host.floating_rect.is_none();
         let origin = self.host.hwnd.map(super::win32::window_rect);
-        let anchor =
-            anchor.unwrap_or_else(|| origin.map_or((0, 0), |r| (r.right - 1, r.bottom - 1)));
+        let anchor = anchor.unwrap_or_else(|| {
+            origin.map_or((0, 0), |r| {
+                // A full-height technical host can extend off-screen. Pick
+                // its anchored edge, not its transparent opposite edge.
+                (
+                    r.right - 1,
+                    if self.host.placement.top {
+                        r.top + 1
+                    } else {
+                        r.bottom - 1
+                    },
+                )
+            })
+        });
         let (monitor, rect) = if self.ui.popup_floating {
             let live_origin = origin.filter(|_| {
                 self.host.floating_rect.is_some()
@@ -1914,7 +1933,7 @@ impl Render for PopupRoot {
 
         self.host.header_height = self.fx.value(
             fx::key("floating-header-height"),
-            if self.ui.popup_floating {
+            if self.ui.compact_bar_visible() {
                 super::footer::FLOATING_HEADER_HEIGHT
             } else {
                 0.0

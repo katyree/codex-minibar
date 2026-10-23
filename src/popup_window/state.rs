@@ -430,6 +430,7 @@ pub(crate) struct UiState {
     pub(super) total_spend_period: TotalSpendPeriod,
     pub(super) show_account_name: bool,
     pub(super) show_edit_home_button: bool,
+    pub(super) show_popup_action_bar: bool,
     pub(super) popup_pinned: bool,
     pub(super) popup_floating: bool,
     pub(super) popup_height_dip: Option<u32>,
@@ -485,6 +486,7 @@ impl Default for UiState {
             total_spend_period: TotalSpendPeriod::default(),
             show_account_name: false,
             show_edit_home_button: true,
+            show_popup_action_bar: true,
             popup_pinned: false,
             popup_floating: false,
             popup_height_dip: None,
@@ -504,6 +506,9 @@ impl Default for UiState {
 }
 
 impl UiState {
+    pub(super) fn compact_bar_visible(&self) -> bool {
+        self.popup_floating || self.show_popup_action_bar
+    }
     /// Shared seed for both the render tree and the background bridge. The
     /// bridge publishes a complete snapshot, so it must restore layout and
     /// effective usage eligibility before either path can produce a first frame.
@@ -514,6 +519,8 @@ impl UiState {
             popup_tab_mode: settings.popup_tab_mode,
             grouped_tab_selection: settings.grouped_tab_selection.clone(),
             popup_two_columns: settings.popup_two_columns,
+            show_popup_action_bar: settings.show_popup_action_bar,
+            popup_floating: settings.popup_floating,
             popup_home_order: settings.popup_home_order.clone(),
             popup_home_right_column: settings.popup_home_right_column.clone(),
             popup_home_card_layouts: settings.popup_home_card_layouts.clone(),
@@ -547,6 +554,7 @@ impl UiState {
         self.total_spend_period = settings.total_spend_period;
         self.show_account_name = settings.show_account_name;
         self.show_edit_home_button = settings.show_edit_home_button;
+        self.show_popup_action_bar = settings.show_popup_action_bar;
         self.popup_pinned = settings.popup_pinned;
         self.popup_floating = settings.popup_floating;
         self.popup_height_dip = settings.popup_height_dip;

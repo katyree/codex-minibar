@@ -2046,3 +2046,6 @@ popup-position-description = La posición se recuerda entre sesiones.
 popup-reset-position = Restablecer posición
 popup-drag-header = Arrastra para mover
 popup-close = Cerrar panel
+
+show-popup-action-bar = Mostrar barra de acciones del panel emergente
+show-popup-action-bar-description = Mostrar el título y las acciones en el panel emergente normal. Los paneles flotantes siempre muestran esta barra.

@@ -113,6 +113,16 @@ impl SettingsWindow {
                     self,
                     k,
                     cx,
+                    "customize-popup-action-bar",
+                    crate::i18n::tr("show-popup-action-bar"),
+                    Some(crate::i18n::tr("show-popup-action-bar-description")),
+                    |s| s.show_popup_action_bar,
+                    |s, v| s.show_popup_action_bar = v,
+                ),
+                bool_row(
+                    self,
+                    k,
+                    cx,
                     "customize-two-columns",
                     crate::i18n::tr("use-two-columns"),
                     Some(crate::i18n::tr(

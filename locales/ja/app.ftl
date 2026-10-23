@@ -2927,3 +2927,6 @@ popup-position-description = 位置は次回の起動時にも復元されます
 popup-reset-position = 位置をリセット
 popup-drag-header = ドラッグして移動
 popup-close = パネルを閉じる
+
+show-popup-action-bar = ポップアップのアクションバーを表示
+show-popup-action-bar-description = 通常のポップアップにアプリ名と操作ボタンを表示します。フローティングパネルでは常に表示されます。

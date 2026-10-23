@@ -2046,3 +2046,6 @@ popup-position-description = A posição é lembrada entre sessões.
 popup-reset-position = Redefinir posição
 popup-drag-header = Arraste para mover
 popup-close = Fechar painel
+
+show-popup-action-bar = Mostrar barra de ações do popup
+show-popup-action-bar-description = Mostrar o título e as ações no popup normal. Painéis flutuantes sempre mostram esta barra.

@@ -1,4 +1,4 @@
-//! Footer: page tabs on the left, pin/refresh/settings/update on the right.
+//! Shared compact action bar and footer tabs with refresh/settings/update.
 
 use std::rc::Rc;
 
@@ -86,6 +86,11 @@ impl PopupRoot {
 
     pub(super) fn render_floating_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let editing = self.home_editing;
+        let edit_presence = self.fx.toggle(
+            fx::key("compact-edit-presence"),
+            self.ui.show_edit_home_button || editing,
+            fx::NORMAL,
+        );
         let edit = self.render_action_button(
             "floating-edit-home",
             if editing {
@@ -151,10 +156,20 @@ impl PopupRoot {
                     .right(px(4.0))
                     .top(px(4.0))
                     .flex()
-                    .gap(px(4.0))
-                    .child(edit)
+                    .children((edit_presence > 0.0).then(|| {
+                        div()
+                            .relative()
+                            .flex_none()
+                            .w(px(28.0 * edit_presence))
+                            .h(px(24.0))
+                            .overflow_hidden()
+                            .opacity(edit_presence)
+                            .child(div().absolute().left_0().top_0().child(edit))
+                    }))
                     .child(columns)
+                    .child(div().w(px(4.0)).flex_none())
                     .child(pin)
+                    .child(div().w(px(4.0)).flex_none())
                     .child(close),
             )
             .into_any_element()
@@ -235,17 +250,16 @@ impl PopupRoot {
         let tabs = self.tab_specs();
         let step = button + spacing;
         let content_width = tabs.len() as f32 * step - spacing;
-        // The floating header owns Edit/Done. Without that header, Done stays
-        // available even when Customize hides the bottom bar's Edit button.
+        // Restore essential controls here when the popup action bar is hidden.
         let editing = self.home_editing;
         let edit_presence = self.fx.toggle(
             fx::key("footer-edit-presence"),
-            !self.ui.popup_floating && (self.ui.show_edit_home_button || editing),
+            !self.ui.compact_bar_visible() && (self.ui.show_edit_home_button || editing),
             fx::NORMAL,
         );
         let pin_presence = self.fx.toggle(
             fx::key("footer-pin-presence"),
-            !self.ui.popup_floating,
+            !self.ui.compact_bar_visible(),
             fx::NORMAL,
         );
         let action_count = 2.0

@@ -2948,3 +2948,6 @@ popup-position-description = Die Position wird zwischen Sitzungen gespeichert.
 popup-reset-position = Position zurücksetzen
 popup-drag-header = Zum Verschieben ziehen
 popup-close = Fenster schließen
+
+show-popup-action-bar = Aktionsleiste im Popup anzeigen
+show-popup-action-bar-description = App-Titel und Aktionen im normalen Popup anzeigen. Schwebende Fenster zeigen diese Leiste immer.

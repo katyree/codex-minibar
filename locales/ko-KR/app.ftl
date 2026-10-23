@@ -2926,3 +2926,6 @@ popup-position-description = 세션 간에 위치가 저장됩니다.
 popup-reset-position = 위치 초기화
 popup-drag-header = 드래그하여 이동
 popup-close = 패널 닫기
+
+show-popup-action-bar = 팝업 작업 표시줄 표시
+show-popup-action-bar-description = 일반 팝업에 앱 이름과 작업 버튼을 표시합니다. 플로팅 패널에는 항상 표시됩니다.

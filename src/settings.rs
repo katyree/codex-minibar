@@ -2188,8 +2188,10 @@ pub struct Settings {
     /// Last selected Usage Stats time range on the Home tab.
     pub total_spend_period: TotalSpendPeriod,
     pub show_account_name: bool,
-    /// Shows the Edit Home button in the popup's bottom bar.
+    /// Shows the Edit Home button in the popup's compact action bar.
     pub show_edit_home_button: bool,
+    /// Compact action bar in tray popup mode; floating panels always show it.
+    pub show_popup_action_bar: bool,
     /// Shared pin/Always on top setting: stay above other apps and remain open.
     pub popup_pinned: bool,
     /// Detached panel with a draggable header and top-anchored content.
@@ -2275,6 +2277,7 @@ impl Default for Settings {
             total_spend_period: TotalSpendPeriod::default(),
             show_account_name: false,
             show_edit_home_button: true,
+            show_popup_action_bar: true,
             popup_pinned: false,
             popup_floating: false,
             popup_height_dip: None,
@@ -4493,6 +4496,15 @@ enabled = ["codex", "claude"]
                 assert_eq!(restored.popup_pinned, pinned);
             }
         }
+    }
+
+    #[test]
+    fn popup_action_bar_defaults_visible_and_persists_when_hidden() {
+        let mut settings: Settings = toml::from_str("onboarding_completed = true").unwrap();
+        assert!(settings.show_popup_action_bar);
+        settings.show_popup_action_bar = false;
+        let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+        assert!(!restored.show_popup_action_bar);
     }
 
     #[test]

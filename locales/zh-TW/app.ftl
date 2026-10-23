@@ -2025,3 +2025,6 @@ popup-position-description = 下次啟動時還原面板位置。
 popup-reset-position = 重設位置
 popup-drag-header = 拖曳以移動
 popup-close = 關閉面板
+
+show-popup-action-bar = 顯示彈出面板操作列
+show-popup-action-bar-description = 在一般彈出面板中顯示應用程式名稱和操作按鈕。浮動面板一律顯示此列。

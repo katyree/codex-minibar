@@ -2954,3 +2954,6 @@ popup-position-description = Положение сохраняется межд�
 popup-reset-position = Сбросить положение
 popup-drag-header = Перетащите, чтобы переместить
 popup-close = Закрыть панель
+
+show-popup-action-bar = Показывать панель действий попапа
+show-popup-action-bar-description = Показывать название приложения и кнопки действий в обычном попапе. В плавающей панели эта строка видна всегда.
