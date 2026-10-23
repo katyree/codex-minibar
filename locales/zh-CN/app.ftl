@@ -195,8 +195,8 @@ updated = 已更新{ " " }
 refresh-last-updated-relative = 刷新 · 上次更新于 { $relative }
 
 # src/popup_window/ui/footer.rs
-popup-pin = 保持打开
-popup-unpin = 点击外部时关闭
+popup-pin = 置顶固定并保持打开
+popup-unpin = 取消固定并在失去焦点时关闭
 
 edit-home = 编辑主页
 home-card-layout = 布局
@@ -2019,7 +2019,7 @@ time-late = 延迟 { $time }
 popup-floating = 浮动面板
 popup-floating-description = 保持面板打开，拖动标题栏可移动到其他位置或显示器。
 popup-always-on-top = 始终置顶
-popup-always-on-top-description = 将浮动面板显示在其他应用上方。
+popup-always-on-top-description = 将面板显示在其他应用上方，切换应用时保持打开。
 popup-position = 面板位置
 popup-position-description = 下次启动时恢复面板位置。
 popup-reset-position = 重置位置

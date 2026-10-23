@@ -109,6 +109,12 @@ fn measured_page_height(height: f32, scale: f32) -> f32 {
     ((height * scale - 0.01).ceil() / scale).max(PAGE_PADDING * 2.0)
 }
 
+fn popup_height_bounds(content: f32, chrome: f32, screen: f32) -> (f32, f32) {
+    let maximum = (content + chrome).clamp(80.0_f32.min(screen), screen);
+    let minimum = (chrome + 64.0).max(160.0).min(maximum);
+    (minimum, maximum)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum Phase {
     Hidden,
@@ -133,6 +139,7 @@ pub(super) struct Host {
     #[cfg(windows)]
     pub(super) floating_rect: Option<super::win32::Rect>,
     pub(super) header_height: f32,
+    resizing_height: bool,
     reopen_after_hide: bool,
     pub(super) phase: Phase,
     pub(super) height: Spring,
@@ -160,6 +167,7 @@ impl Host {
             #[cfg(windows)]
             floating_rect: None,
             header_height: 0.0,
+            resizing_height: false,
             reopen_after_hide: false,
             phase: Phase::Hidden,
             height: Spring::at(f64::from(INITIAL_HEIGHT)),
@@ -903,9 +911,13 @@ impl PopupRoot {
     }
 
     pub(crate) fn begin_hide(&mut self, cx: &mut Context<Self>) {
+        self.host.resizing_height = false;
         self.host.reopen_after_hide = false;
         #[cfg(windows)]
-        super::win32::set_drag_header(None);
+        {
+            super::win32::set_drag_header(None);
+            super::win32::set_resize_area(None);
+        }
         match self.host.phase {
             Phase::Hidden | Phase::Prewarm | Phase::Closing(..) => {}
             _ => {
@@ -1191,22 +1203,56 @@ impl PopupRoot {
     }
 
     fn target_height(&self, view: PopupView) -> f32 {
+        let (minimum, maximum) = self.resize_height_bounds(view);
+        if self.host.resizing_height {
+            return (self.host.height.position as f32).clamp(minimum, maximum);
+        }
+        if let Some(height) = self.ui.popup_height_dip {
+            return (height as f32).clamp(minimum, maximum);
+        }
+        maximum
+    }
+
+    fn resize_height_bounds(&self, view: PopupView) -> (f32, f32) {
         let chrome = self.footer_height()
             + self.target_profile_strip_height()
             + self.host.header_height
             + CHROME_INSET * 2.0;
-        // Usage loads asynchronously and its content height swings with the
-        // range and provider count; a fixed full-height shell never jumps.
-        if view == PopupView::Usage {
-            return self.host.max_height();
-        }
         let content = self
             .pages
             .get(&view)
             .map(|metrics| metrics.content_height.get())
             .filter(|height| *height > 1.0)
             .unwrap_or(INITIAL_HEIGHT - chrome);
-        (content + chrome).clamp(80.0, self.host.max_height())
+        popup_height_bounds(content, chrome, self.host.max_height())
+    }
+
+    pub(super) fn resize_height(
+        &mut self,
+        height_dip: f32,
+        finished: bool,
+        cx: &mut Context<Self>,
+    ) {
+        if self.host.phase != Phase::Open || !height_dip.is_finite() {
+            return;
+        }
+        let (minimum, maximum) = self.resize_height_bounds(self.pager.current);
+        let height = height_dip.clamp(minimum, maximum);
+        let saved = height.round() as u32;
+        self.host.resizing_height = !finished;
+        // Direct manipulation follows the pointer without spring lag.
+        self.host.height.snap(f64::from(height));
+        self.host.last_region = None;
+        if finished {
+            self.persist(
+                cx,
+                move |ui| ui.popup_height_dip = Some(saved),
+                move |settings| settings.popup_height_dip = Some(saved),
+            );
+        } else {
+            Rc::make_mut(&mut self.ui).popup_height_dip = Some(saved);
+            cx.notify();
+        }
     }
 
     /// Advance window motion for this frame. Returns `(width, height, offset)`.
@@ -1229,6 +1275,7 @@ impl PopupRoot {
         let target_h = self.target_height(self.pager.current);
         let target_w = self.target_width(self.pager.current);
         let animate = super::animations_enabled(&self.ui)
+            && !self.host.resizing_height
             && self.host.visible()
             && self.host.phase != Phase::Prewarm;
         let opening_early = matches!(self.host.phase, Phase::Opening(started)
@@ -1349,6 +1396,22 @@ impl PopupRoot {
                 (left, top, right, bottom)
             };
             let surface = pixels(x, y, width, height);
+            let (minimum, maximum) = self.resize_height_bounds(self.pager.current);
+            super::win32::set_resize_area((self.host.phase == Phase::Open).then_some(
+                super::win32::ResizeArea {
+                    surface: super::win32::Rect {
+                        left: surface.0,
+                        top: surface.1,
+                        right: surface.2,
+                        bottom: surface.3,
+                    },
+                    top_anchored: self.host.placement.top,
+                    floating: self.ui.popup_floating,
+                    scale,
+                    minimum,
+                    maximum,
+                },
+            ));
             super::win32::set_drag_header(
                 (self.ui.popup_floating && self.host.phase == Phase::Open).then(|| {
                     let (left, top, right, bottom) = pixels(
@@ -1596,6 +1659,7 @@ impl PopupRoot {
             move |ui| ui.popup_pinned = pinned,
             move |settings| settings.popup_pinned = pinned,
         );
+        send_command(PopupCommand::SyncPin);
     }
 
     pub(super) fn toggle_two_columns(&mut self, cx: &mut Context<Self>) {
@@ -2688,6 +2752,19 @@ pub(super) fn eid(value: impl Into<String>) -> ElementId {
 #[cfg(test)]
 mod geometry_tests {
     use super::*;
+
+    #[test]
+    fn resize_height_is_limited_by_content_and_screen_without_forcing_empty_space() {
+        assert_eq!(popup_height_bounds(300.0, 60.0, 1080.0), (160.0, 360.0));
+        assert_eq!(popup_height_bounds(2000.0, 100.0, 1080.0), (164.0, 1080.0));
+        assert_eq!(popup_height_bounds(20.0, 80.0, 1080.0), (100.0, 100.0));
+        assert_eq!(popup_height_bounds(2000.0, 100.0, 120.0), (120.0, 120.0));
+        let preferred = 900.0_f32;
+        let (minimum, maximum) = popup_height_bounds(300.0, 60.0, 1080.0);
+        assert_eq!(preferred.clamp(minimum, maximum), 360.0);
+        let (minimum, maximum) = popup_height_bounds(2000.0, 60.0, 1080.0);
+        assert_eq!(preferred.clamp(minimum, maximum), 900.0);
+    }
 
     #[test]
     fn profile_rows_fill_each_row_and_select_only_the_matching_stable_id() {

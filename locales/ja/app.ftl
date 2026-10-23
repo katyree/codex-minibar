@@ -293,8 +293,8 @@ updated = 更新済み{ " " }
 refresh-last-updated-relative = 更新 · 最終更新: { $relative }
 
 # src/popup_window/ui/footer.rs
-popup-pin = 開いたままにする
-popup-unpin = 外側をクリックしたら閉じる
+popup-pin = 最前面に固定して開いたままにする
+popup-unpin = 固定を解除し、フォーカスを失ったら閉じる
 
 # src/popup_window/ui/home.rs
 edit-home = ホームを編集
@@ -2921,7 +2921,7 @@ time-late = { $time }遅延
 popup-floating = フローティングパネル
 popup-floating-description = パネルを開いたまま、ヘッダーをドラッグして位置やモニターを変更できます。
 popup-always-on-top = 常に最前面
-popup-always-on-top-description = フローティングパネルを他のアプリより手前に表示します。
+popup-always-on-top-description = パネルを他のアプリより手前に表示し、アプリを切り替えても開いたままにします。
 popup-position = パネルの位置
 popup-position-description = 位置は次回の起動時にも復元されます。
 popup-reset-position = 位置をリセット

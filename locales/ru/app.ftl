@@ -291,8 +291,8 @@ updated = Обновлено{ " " }
 refresh-last-updated-relative = Обновить | Последнее обновление: { $relative }
 
 # src/popup_window/ui/footer.rs
-popup-pin = Не закрывать
-popup-unpin = Закрывать по клику снаружи
+popup-pin = Закрепить поверх окон и не закрывать
+popup-unpin = Открепить и закрывать при потере фокуса
 
 # src/popup_window/ui/home.rs
 edit-home = Изменить главную
@@ -2948,7 +2948,7 @@ time-late = опоздание { $time }
 popup-floating = Плавающая панель
 popup-floating-description = Панель остаётся открытой; перетаскивайте её за заголовок в любое место или на другой монитор.
 popup-always-on-top = Поверх всех окон
-popup-always-on-top-description = Показывать плавающую панель поверх других приложений.
+popup-always-on-top-description = Показывать панель поверх других приложений и не закрывать при переключении между ними.
 popup-position = Положение панели
 popup-position-description = Положение сохраняется между запусками.
 popup-reset-position = Сбросить положение

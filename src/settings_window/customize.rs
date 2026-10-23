@@ -70,8 +70,8 @@ impl SettingsWindow {
                     "popup-always-on-top",
                     crate::i18n::tr("popup-always-on-top"),
                     Some(crate::i18n::tr("popup-always-on-top-description")),
-                    |s| s.popup_always_on_top,
-                    |s, v| s.popup_always_on_top = v,
+                    |s| s.popup_pinned,
+                    |s, v| s.popup_pinned = v,
                 ),
                 Row::new("popup-position", crate::i18n::tr("popup-position"))
                     .description(k, crate::i18n::tr("popup-position-description"))

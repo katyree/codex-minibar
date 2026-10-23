@@ -33,7 +33,7 @@ pub const WINDOW_CORNER_RADIUS_DIP: i32 = PopupCornerRadius::Small.dip();
 /// Gap between the capsule and the monitor/taskbar edges, in physical pixels.
 pub const EDGE_MARGIN_PX: i32 = 20;
 /// Popup height as a share of the monitor it is opened on.
-pub const POPUP_SCREEN_HEIGHT_FRACTION: f64 = 0.80;
+pub const POPUP_SCREEN_HEIGHT_FRACTION: f64 = 1.0;
 /// Ignore outside presses briefly after open so the tray click that showed us
 /// cannot immediately dismiss.
 const SHOW_GRACE_MS: i64 = 200;
@@ -85,7 +85,9 @@ pub(crate) fn set_lifecycle(visible: bool, closing: bool) {
 /// Keep the popup open while it shows something the user must not lose,
 /// such as a newly created key that can never be shown again.
 pub(crate) fn set_reveal_pinned(pinned: bool) {
-    REVEAL_PINNED.store(pinned, Ordering::SeqCst);
+    if REVEAL_PINNED.swap(pinned, Ordering::SeqCst) != pinned {
+        crate::popup_window::send_command(crate::popup_window::PopupCommand::SyncPin);
+    }
 }
 
 pub(crate) fn is_reveal_pinned() -> bool {

@@ -24,18 +24,21 @@ use windows_sys::Win32::{
     UI::{
         Accessibility::{HWINEVENTHOOK, SetWinEventHook},
         HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI},
+        Input::KeyboardAndMouse::{ReleaseCapture, SetCapture},
         Shell::{DefSubclassProc, SetWindowSubclass},
         WindowsAndMessaging::{
-            EVENT_SYSTEM_FOREGROUND, FindWindowExW, GWL_EXSTYLE, GWL_STYLE, GetWindowLongPtrW,
-            GetWindowRect, HTCAPTION, HTCLIENT, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST,
-            MA_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, SWP_FRAMECHANGED, SWP_NOACTIVATE,
-            SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SetForegroundWindow,
-            SetWindowLongPtrW, SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT,
-            WINEVENT_SKIPOWNPROCESS, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_ENTERSIZEMOVE,
-            WM_EXITSIZEMOVE, WM_MOUSEACTIVATE, WM_NCCALCSIZE, WM_NCHITTEST, WM_NCLBUTTONDBLCLK,
-            WM_SETTINGCHANGE, WS_CAPTION, WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
-            WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_MAXIMIZEBOX,
-            WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
+            EVENT_SYSTEM_FOREGROUND, FindWindowExW, GWL_EXSTYLE, GWL_STYLE, GetClassNameW,
+            GetCursorPos, GetWindowLongPtrW, GetWindowRect, HTCAPTION, HTCLIENT, HWND_NOTOPMOST,
+            HWND_TOP, HWND_TOPMOST, IDC_SIZENS, LoadCursorW, MA_NOACTIVATE, SW_HIDE,
+            SW_SHOWNOACTIVATE, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER,
+            SWP_NOSIZE, SWP_NOZORDER, SetCursor, SetForegroundWindow, SetWindowLongPtrW,
+            SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
+            WM_CAPTURECHANGED, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE,
+            WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCCALCSIZE,
+            WM_NCHITTEST, WM_NCLBUTTONDBLCLK, WM_SETCURSOR, WM_SETTINGCHANGE, WS_CAPTION,
+            WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP,
+            WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU,
+            WS_THICKFRAME,
         },
     },
 };
@@ -50,6 +53,83 @@ thread_local! {
     static TOPMOST: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
     static DRAG_HEADER: std::cell::Cell<Option<Rect>> = const { std::cell::Cell::new(None) };
     static MOVING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static RESIZE_AREA: std::cell::Cell<Option<ResizeArea>> = const { std::cell::Cell::new(None) };
+    static HEIGHT_DRAG: std::cell::Cell<Option<HeightDrag>> = const { std::cell::Cell::new(None) };
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct ResizeArea {
+    pub(crate) surface: Rect,
+    pub(crate) top_anchored: bool,
+    pub(crate) floating: bool,
+    pub(crate) scale: f32,
+    pub(crate) minimum: f32,
+    pub(crate) maximum: f32,
+}
+
+impl ResizeArea {
+    fn edge_at(self, x: i32, y: i32) -> Option<bool> {
+        let band = (5.0 * self.scale).ceil() as i32;
+        let r = self.surface;
+        if x < r.left + band || x >= r.right - band {
+            return None;
+        }
+        if (self.floating || !self.top_anchored) && y >= r.top && y < r.top + band {
+            Some(true)
+        } else if (self.floating || self.top_anchored) && y >= r.bottom - band && y < r.bottom {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    fn contains_edge(self, x: i32, y: i32) -> bool {
+        self.edge_at(x, y).is_some()
+    }
+}
+
+#[derive(Clone, Copy)]
+struct HeightDrag {
+    area: ResizeArea,
+    start_y: i32,
+    last_height: f32,
+    top_edge: bool,
+    fixed_bottom: Option<i32>,
+}
+
+impl HeightDrag {
+    fn height_at(self, y: i32) -> f32 {
+        let delta = (y - self.start_y) as f32 / self.area.scale;
+        let initial = self.area.surface.height() as f32 / self.area.scale;
+        (initial + if self.top_edge { -delta } else { delta })
+            .clamp(self.area.minimum, self.area.maximum)
+    }
+}
+
+pub(crate) fn set_resize_area(area: Option<ResizeArea>) {
+    RESIZE_AREA.set(area);
+}
+
+fn pointer(hwnd: HWND) -> (i32, i32, i32) {
+    let mut point = POINT { x: 0, y: 0 };
+    unsafe { GetCursorPos(&mut point) };
+    let rect = window_rect(hwnd);
+    (point.x - rect.left, point.y - rect.top, point.y)
+}
+
+fn publish_height(drag: HeightDrag, finished: bool) {
+    crate::popup_window::send_command(crate::popup_window::PopupCommand::ResizeHeight {
+        height_dip: drag.last_height,
+        finished,
+        fixed_bottom: drag.fixed_bottom,
+    });
+}
+
+fn finish_height_drag() {
+    if let Some(drag) = HEIGHT_DRAG.take() {
+        crate::popup::set_dragging(false);
+        publish_height(drag, true);
+    }
 }
 
 pub(crate) fn set_drag_header(rect: Option<Rect>) {
@@ -139,6 +219,59 @@ unsafe extern "system" fn popup_subclass_proc(
     _data: usize,
 ) -> LRESULT {
     match message {
+        WM_SETCURSOR => {
+            let (x, y, _) = pointer(hwnd);
+            if HEIGHT_DRAG.get().is_some()
+                || RESIZE_AREA
+                    .get()
+                    .is_some_and(|area| area.contains_edge(x, y))
+            {
+                unsafe { SetCursor(LoadCursorW(std::ptr::null_mut(), IDC_SIZENS)) };
+                return 1;
+            }
+            unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
+        }
+        WM_LBUTTONDOWN => {
+            let (x, y, screen_y) = pointer(hwnd);
+            if let Some(area) = RESIZE_AREA.get().filter(|area| area.contains_edge(x, y)) {
+                let top_edge = area.edge_at(x, y) == Some(true);
+                HEIGHT_DRAG.set(Some(HeightDrag {
+                    area,
+                    start_y: screen_y,
+                    last_height: area.surface.height() as f32 / area.scale,
+                    top_edge,
+                    fixed_bottom: (area.floating && top_edge)
+                        .then(|| window_rect(hwnd).top + area.surface.bottom),
+                }));
+                crate::popup::set_dragging(true);
+                unsafe { SetCapture(hwnd) };
+                return 0;
+            }
+            unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
+        }
+        WM_MOUSEMOVE if HEIGHT_DRAG.get().is_some() => {
+            let (_, _, y) = pointer(hwnd);
+            if let Some(mut drag) = HEIGHT_DRAG.get() {
+                drag.last_height = drag.height_at(y);
+                HEIGHT_DRAG.set(Some(drag));
+                publish_height(drag, false);
+            }
+            0
+        }
+        WM_LBUTTONUP if HEIGHT_DRAG.get().is_some() => {
+            let (_, _, y) = pointer(hwnd);
+            if let Some(mut drag) = HEIGHT_DRAG.get() {
+                drag.last_height = drag.height_at(y);
+                HEIGHT_DRAG.set(Some(drag));
+            }
+            finish_height_drag();
+            unsafe { ReleaseCapture() };
+            0
+        }
+        WM_CAPTURECHANGED => {
+            finish_height_drag();
+            unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
+        }
         SHOW_MESSAGE => {
             crate::popup::show_near_cursor();
             0
@@ -151,6 +284,12 @@ unsafe extern "system" fn popup_subclass_proc(
             let origin = window_rect(hwnd);
             let x = (lparam as u32 as u16 as i16) as i32 - origin.left;
             let y = ((lparam as u32 >> 16) as u16 as i16) as i32 - origin.top;
+            if RESIZE_AREA
+                .get()
+                .is_some_and(|area| area.contains_edge(x, y))
+            {
+                return HTCLIENT as LRESULT;
+            }
             if DRAG_HEADER
                 .get()
                 .is_some_and(|r| x >= r.left && x < r.right && y >= r.top && y < r.bottom)
@@ -289,15 +428,30 @@ fn restyle(hwnd: HWND) {
 unsafe extern "system" fn foreground_changed(
     _hook: HWINEVENTHOOK,
     _event: u32,
-    _hwnd: HWND,
+    hwnd: HWND,
     _object: i32,
     _child: i32,
     _thread: u32,
     _time: u32,
 ) {
     // SetWindowPos re-enters GPUI; defer to the foreground command task.
-    if crate::popup::is_visible() && TOPMOST.get() {
-        crate::popup_window::send_command(crate::popup_window::PopupCommand::Raise);
+    if crate::popup::is_visible() {
+        if !crate::popup::is_pinned() {
+            // The tray owns its toggle. Closing here first can make the tray
+            // click interpret the closing popup as a request to reopen it.
+            let mut class = [0u16; 64];
+            let len = unsafe { GetClassNameW(hwnd, class.as_mut_ptr(), class.len() as i32) }.max(0)
+                as usize;
+            if ["Shell_TrayWnd", "Shell_SecondaryTrayWnd"]
+                .iter()
+                .any(|name| name.encode_utf16().eq(class[..len].iter().copied()))
+            {
+                return;
+            }
+            crate::popup::hide();
+        } else if TOPMOST.get() {
+            crate::popup_window::send_command(crate::popup_window::PopupCommand::Raise);
+        }
     }
 }
 
@@ -479,6 +633,11 @@ pub(crate) fn show(hwnd: HWND) {
 }
 
 pub(crate) fn hide(hwnd: HWND) {
+    set_resize_area(None);
+    if HEIGHT_DRAG.get().is_some() {
+        finish_height_drag();
+        unsafe { ReleaseCapture() };
+    }
     unsafe {
         ShowWindow(hwnd, SW_HIDE);
     }
@@ -575,5 +734,94 @@ pub(crate) fn place_keep_order(hwnd: HWND, rect: Rect) {
             rect.height().max(1),
             SWP_NOACTIVATE | SWP_NOZORDER,
         );
+    }
+}
+
+#[cfg(test)]
+mod resize_tests {
+    use super::*;
+
+    fn area(top_anchored: bool, scale: f32) -> ResizeArea {
+        ResizeArea {
+            surface: Rect {
+                left: 10,
+                top: 100,
+                right: 410,
+                bottom: 500,
+            },
+            top_anchored,
+            floating: false,
+            scale,
+            minimum: 160.0,
+            maximum: 1080.0 / scale,
+        }
+    }
+
+    #[test]
+    fn resize_hit_band_follows_the_free_edge_for_top_and_bottom_popups() {
+        for top_anchored in [false, true] {
+            let area = area(top_anchored, 1.0);
+            assert_eq!(area.contains_edge(100, 102), !top_anchored);
+            assert_eq!(area.contains_edge(100, 498), top_anchored);
+            assert!(!area.contains_edge(100, 300));
+            assert!(!area.contains_edge(10, if top_anchored { 498 } else { 102 }));
+        }
+    }
+
+    #[test]
+    fn resize_direction_matches_the_fixed_edge() {
+        for top_anchored in [false, true] {
+            let drag = HeightDrag {
+                area: area(top_anchored, 1.0),
+                start_y: 400,
+                last_height: 400.0,
+                top_edge: !top_anchored,
+                fixed_bottom: None,
+            };
+            assert_eq!(
+                drag.height_at(500),
+                if top_anchored { 500.0 } else { 300.0 }
+            );
+            assert_eq!(
+                drag.height_at(300),
+                if top_anchored { 300.0 } else { 500.0 }
+            );
+        }
+    }
+
+    #[test]
+    fn resize_uses_dips_and_caps_at_full_screen_height() {
+        let drag = HeightDrag {
+            area: area(true, 2.0),
+            start_y: -500,
+            last_height: 200.0,
+            top_edge: false,
+            fixed_bottom: None,
+        };
+        assert_eq!(drag.height_at(-300), 300.0);
+        assert_eq!(drag.height_at(5000), 540.0);
+        assert_eq!(drag.height_at(-5000), 160.0);
+    }
+
+    #[test]
+    fn floating_panel_exposes_both_resize_edges_and_respects_content_cap() {
+        let area = ResizeArea {
+            floating: true,
+            maximum: 450.0,
+            ..area(true, 1.0)
+        };
+        assert_eq!(area.edge_at(100, 102), Some(true));
+        assert_eq!(area.edge_at(100, 498), Some(false));
+        for top_edge in [false, true] {
+            let drag = HeightDrag {
+                area,
+                start_y: 400,
+                last_height: 400.0,
+                top_edge,
+                fixed_bottom: top_edge.then_some(700),
+            };
+            assert_eq!(drag.height_at(if top_edge { -5000 } else { 5000 }), 450.0);
+            assert_eq!(drag.height_at(if top_edge { 5000 } else { -5000 }), 160.0);
+        }
     }
 }

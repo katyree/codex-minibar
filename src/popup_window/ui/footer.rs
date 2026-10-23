@@ -17,7 +17,7 @@ use super::{
 use crate::popup_window::{model, *};
 
 pub(super) const FLOATING_HEADER_HEIGHT: f32 = 32.0;
-pub(super) const FLOATING_HEADER_ACTIONS_WIDTH: f32 = 84.0;
+pub(super) const FLOATING_HEADER_ACTIONS_WIDTH: f32 = 112.0;
 
 /// Payload carried while a provider tab is dragged to a new position.
 #[derive(Clone)]
@@ -85,6 +85,23 @@ impl PopupRoot {
     }
 
     pub(super) fn render_floating_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let editing = self.home_editing;
+        let edit = self.render_action_button(
+            "floating-edit-home",
+            if editing {
+                "fluent-checkmark"
+            } else {
+                "fluent-edit"
+            },
+            crate::i18n::tr(if editing { "done" } else { "edit-home" }).into(),
+            24.0,
+            16.0,
+            editing,
+            cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.set_home_editing(!this.home_editing, cx)
+            }),
+            cx,
+        );
         let columns = self.render_action_button(
             "two-columns",
             "fluent-layout-column-two",
@@ -135,6 +152,7 @@ impl PopupRoot {
                     .top(px(4.0))
                     .flex()
                     .gap(px(4.0))
+                    .child(edit)
                     .child(columns)
                     .child(pin)
                     .child(close),
@@ -217,12 +235,12 @@ impl PopupRoot {
         let tabs = self.tab_specs();
         let step = button + spacing;
         let content_width = tabs.len() as f32 * step - spacing;
-        // Customize can hide the Edit button; it still appears as Done while
-        // editing (started from Settings) so edit mode can always be left.
+        // The floating header owns Edit/Done. Without that header, Done stays
+        // available even when Customize hides the bottom bar's Edit button.
         let editing = self.home_editing;
         let edit_presence = self.fx.toggle(
             fx::key("footer-edit-presence"),
-            self.ui.show_edit_home_button || editing,
+            !self.ui.popup_floating && (self.ui.show_edit_home_button || editing),
             fx::NORMAL,
         );
         let pin_presence = self.fx.toggle(

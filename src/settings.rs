@@ -2190,11 +2190,12 @@ pub struct Settings {
     pub show_account_name: bool,
     /// Shows the Edit Home button in the popup's bottom bar.
     pub show_edit_home_button: bool,
-    /// Footer pin: outside clicks and Escape leave the popup open.
+    /// Shared pin/Always on top setting: stay above other apps and remain open.
     pub popup_pinned: bool,
     /// Detached panel with a draggable header and top-anchored content.
     pub popup_floating: bool,
-    pub popup_always_on_top: bool,
+    /// User-selected popup height in DIPs, shared by tray and floating modes.
+    pub popup_height_dip: Option<u32>,
     pub popup_position: Option<PopupPosition>,
     /// System-wide shortcut that shows or hides the popup. None leaves every
     /// key combination to other applications.
@@ -2276,7 +2277,7 @@ impl Default for Settings {
             show_edit_home_button: true,
             popup_pinned: false,
             popup_floating: false,
-            popup_always_on_top: true,
+            popup_height_dip: None,
             popup_position: None,
             popup_hotkey: None,
             // An empty list intentionally means "show the ordinary app icon".
@@ -4461,11 +4462,11 @@ enabled = ["codex", "claude"]
     fn floating_panel_settings_default_to_tray_and_round_trip() {
         let mut settings: Settings = toml::from_str("onboarding_completed = true").unwrap();
         assert!(!settings.popup_floating);
-        assert!(settings.popup_always_on_top);
         assert!(settings.popup_position.is_none());
+        assert_eq!(settings.popup_height_dip, None);
+        settings.popup_height_dip = Some(900);
         settings.popup_floating = true;
         settings.popup_pinned = true;
-        settings.popup_always_on_top = false;
         settings.popup_position = Some(PopupPosition {
             monitor: r"\\.\DISPLAY2".into(),
             x_dip: 140,
@@ -4475,6 +4476,23 @@ enabled = ["codex", "claude"]
         });
         let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
         assert_eq!(restored, settings);
+    }
+
+    #[test]
+    fn popup_pin_is_the_single_source_for_legacy_always_on_top_settings() {
+        for pinned in [false, true] {
+            for legacy_topmost in [false, true] {
+                let settings: Settings = toml::from_str(&format!(
+                    "popup_pinned = {pinned}\npopup_always_on_top = {legacy_topmost}"
+                ))
+                .unwrap();
+                assert_eq!(settings.popup_pinned, pinned);
+                let saved = toml::to_string(&settings).unwrap();
+                assert!(!saved.contains("popup_always_on_top"));
+                let restored: Settings = toml::from_str(&saved).unwrap();
+                assert_eq!(restored.popup_pinned, pinned);
+            }
+        }
     }
 
     #[test]

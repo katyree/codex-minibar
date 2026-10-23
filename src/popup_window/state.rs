@@ -432,7 +432,7 @@ pub(crate) struct UiState {
     pub(super) show_edit_home_button: bool,
     pub(super) popup_pinned: bool,
     pub(super) popup_floating: bool,
-    pub(super) popup_always_on_top: bool,
+    pub(super) popup_height_dip: Option<u32>,
     pub(super) popup_position: Option<crate::settings::PopupPosition>,
     /// Every configured instance in display order, enabled or not.
     pub(super) instances: Vec<ProviderInstance>,
@@ -487,7 +487,7 @@ impl Default for UiState {
             show_edit_home_button: true,
             popup_pinned: false,
             popup_floating: false,
-            popup_always_on_top: true,
+            popup_height_dip: None,
             popup_position: None,
             instances: Settings::default().instances,
             popup_tab_mode: PopupTabMode::default(),
@@ -549,7 +549,7 @@ impl UiState {
         self.show_edit_home_button = settings.show_edit_home_button;
         self.popup_pinned = settings.popup_pinned;
         self.popup_floating = settings.popup_floating;
-        self.popup_always_on_top = settings.popup_always_on_top;
+        self.popup_height_dip = settings.popup_height_dip;
         self.popup_position = settings.popup_position.clone();
         self.instances = settings.instances.clone();
         self.popup_tab_mode = settings.popup_tab_mode;
