@@ -45,6 +45,15 @@ const PREWARM_FRAMES: u32 = 3;
 /// backdrop's effect compilation and desktop capture inside DWM, a stall the
 /// slide clock cannot see.
 const PREWARM_EXPOSED_FRAMES: u32 = 6;
+/// Frames an open from hidden keeps the capsule beyond the monitor edge
+/// before its slide clock starts. DWM composes a re-shown window's regrown
+/// swap chain a few frames late, while `DwmFlush` keeps GPUI's own frames
+/// short, so the slide clock cannot see the gap. The entrance curve covers
+/// most of its distance early, so a hidden start reads as no animation.
+const OPEN_HOLD_FRAMES: u32 = 3;
+/// The first open after launch also binds the backdrop and full-size swap
+/// chain in DWM for the first time.
+const FIRST_OPEN_HOLD_FRAMES: u32 = 8;
 /// Pinned profile switcher between the page and the footer.
 const PROFILE_COLUMNS: usize = 4;
 const PROFILE_ROW_GAP: f32 = 6.0;
@@ -153,6 +162,10 @@ pub(super) struct Host {
     pub(super) slide_frame: Option<Instant>,
     /// Frames rendered during `Phase::Prewarm`.
     pub(super) prewarm_frames: u32,
+    /// Remaining off-screen frames before the open slide starts.
+    open_hold_frames: u32,
+    /// Whether any open from hidden has happened since launch.
+    opened_once: bool,
 }
 
 impl Host {
@@ -178,6 +191,8 @@ impl Host {
             scale: 1.0,
             slide_frame: None,
             prewarm_frames: 0,
+            open_hold_frames: 0,
+            opened_once: false,
         }
     }
 
@@ -821,7 +836,15 @@ impl PopupRoot {
             self.host.height.snap(f64::from(target_height));
             let target_width = self.target_width(self.pager.current);
             self.host.width.snap(f64::from(target_width));
+            self.host.open_hold_frames = 0;
             self.host.phase = if super::animations_enabled(&self.ui) {
+                if closing_offset.is_none() {
+                    self.host.open_hold_frames = if self.host.opened_once {
+                        OPEN_HOLD_FRAMES
+                    } else {
+                        FIRST_OPEN_HOLD_FRAMES
+                    };
+                }
                 // Reopening mid-close continues from the current position.
                 let start = closing_offset.unwrap_or(target_width + self.host.margin());
                 let full = target_width + self.host.margin();
@@ -847,6 +870,9 @@ impl PopupRoot {
             for metrics in self.pages.values_mut() {
                 metrics.overflowing = false;
                 metrics.reveal_until = None;
+            }
+            if was_hidden {
+                self.host.opened_once = true;
             }
         }
         crate::popup::set_lifecycle(true, false);
@@ -1277,9 +1303,13 @@ impl PopupRoot {
     /// Advance window motion for this frame. Returns `(width, height, offset)`.
     fn step_motion(&mut self, now: Instant, cx: &mut Context<Self>) -> (f32, f32, f32) {
         if let Phase::Opening(started) = self.host.phase {
-            // Advance the slide by at most one long frame per frame: a stalled
-            // first paint must not skip the entrance.
-            if let Some(last) = self.host.slide_frame {
+            if self.host.open_hold_frames > 0 {
+                // Stay fully beyond the edge until DWM shows real frames.
+                self.host.open_hold_frames -= 1;
+                self.host.phase = Phase::Opening(now);
+            } else if let Some(last) = self.host.slide_frame {
+                // Advance the slide by at most one long frame per frame: a
+                // stalled first paint must not skip the entrance.
                 let stall = now
                     .saturating_duration_since(last)
                     .saturating_sub(SLIDE_MAX_FRAME_STEP);
