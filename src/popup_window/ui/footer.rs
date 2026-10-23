@@ -117,10 +117,15 @@ impl PopupRoot {
                     .h(px(FLOATING_HEADER_HEIGHT))
                     .flex()
                     .items_center()
-                    .justify_center()
-                    .text_size(px(11.0))
+                    .pl(px(10.0))
+                    .gap(px(8.0))
+                    .text_size(px(12.0))
                     .text_color(self.palette.text_secondary)
-                    .child(crate::i18n::tr("popup-drag-header")),
+                    .child(crate::settings_window::kit::image(
+                        "color/app-icon-32.png",
+                        16.0,
+                    ))
+                    .child("Codex Minibar"),
             )
             .child(
                 div()

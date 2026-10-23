@@ -3,6 +3,8 @@
 Enable **Settings > Customize > Floating panel** to detach the popup from the
 taskbar. Enabling it also pins the panel open. Drag the dedicated header to move
 it, including across monitors. Tabs and action buttons remain interactive.
+The header shows the app logo and Codex Minibar title on the left; that area
+remains draggable.
 The pin button is in the header next to the close button in floating mode,
 and in the bottom bar in tray mode. It controls outside-click and Escape
 dismissal. The close button hides the panel without clearing its pin or position;
