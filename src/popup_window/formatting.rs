@@ -121,7 +121,23 @@ pub(crate) fn format_reset_in(reset: Option<DateTime<Utc>>) -> String {
         return crate::i18n::tr("unavailable").into();
     };
 
-    let remaining_minutes = (reset - Utc::now()).num_minutes().max(0);
+    format_minutes((reset - Utc::now()).num_minutes().max(0))
+}
+
+/// "2 h 5 m ago" for a moment in the past.
+pub(crate) fn format_time_ago(at: DateTime<Utc>) -> String {
+    let elapsed = format_minutes((Utc::now() - at).num_minutes().max(0));
+    crate::i18n::format("time-ago", &[("time", elapsed)])
+}
+
+/// "2 h 5 m late" for a deadline in the past.
+pub(crate) fn format_time_late(deadline: DateTime<Utc>) -> String {
+    let elapsed = format_minutes((Utc::now() - deadline).num_minutes().max(0));
+    crate::i18n::format("time-late", &[("time", elapsed)])
+}
+
+/// Compact "6 d 23 h" / "2 h 5 m" / "7 m" duration.
+fn format_minutes(remaining_minutes: i64) -> String {
     let days = remaining_minutes / 1_440;
     let hours = (remaining_minutes % 1_440) / 60;
     let minutes = remaining_minutes % 60;

@@ -1444,3 +1444,58 @@ fn login_notices_offer_sign_in_only_where_minibar_can_sign_in() {
         None
     );
 }
+
+#[test]
+fn announced_reset_rows_track_reception_per_instance() {
+    use crate::reset_feed::{AnnouncedReset, ResetKind, ResetTiming};
+    let now = Utc.with_ymd_and_hms(2026, 10, 23, 12, 0, 0).unwrap();
+    let codex = id(ProviderKind::Codex);
+    let other = ProviderId::new(ProviderKind::Codex, "codex-work");
+    let reset = |id: &str, kind, hours: i64| AnnouncedReset {
+        id: id.into(),
+        kind,
+        timing: ResetTiming::Exact,
+        source_url: None,
+        label: None,
+        reset_at: now + ChronoDuration::hours(hours),
+        not_before: None,
+        received: Default::default(),
+    };
+    let mut resets = vec![
+        reset("long-missed", ResetKind::Forced, -72),
+        reset("superseded", ResetKind::Forced, -30),
+        reset("missed-banked", ResetKind::Banked, -20),
+        reset("received", ResetKind::Forced, -2),
+        reset("upcoming", ResetKind::Forced, 3),
+    ];
+    resets[3]
+        .received
+        .insert(codex.id().to_owned(), now - ChronoDuration::hours(1));
+
+    let phases = |provider| {
+        visible_announced_resets(&resets, provider, now)
+            .into_iter()
+            .map(|row| (row.reset.id.as_str(), row.phase))
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(
+        phases(codex),
+        [
+            ("missed-banked", AnnouncedResetPhase::Missed),
+            (
+                "received",
+                AnnouncedResetPhase::Received(now - ChronoDuration::hours(1))
+            ),
+            ("upcoming", AnnouncedResetPhase::Upcoming),
+        ]
+    );
+    assert_eq!(
+        phases(other),
+        [
+            ("superseded", AnnouncedResetPhase::Missed),
+            ("missed-banked", AnnouncedResetPhase::Missed),
+            ("received", AnnouncedResetPhase::Missed),
+        ]
+    );
+}

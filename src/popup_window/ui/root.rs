@@ -26,7 +26,7 @@ use crate::popup_window::{
     *,
 };
 use crate::{
-    reset_feed::ForcedReset,
+    reset_feed::AnnouncedReset,
     usage_overview::{BreakdownMode, OverviewMetric, OverviewRange, OverviewSnapshot},
 };
 
@@ -253,7 +253,7 @@ pub(crate) struct PopupRoot {
     pub(super) state: Arc<AppState>,
     pub(super) ui: Rc<UiState>,
     pub(super) limits: Rc<ProviderLimits>,
-    pub(super) forced_resets: Rc<Vec<ForcedReset>>,
+    pub(super) forced_resets: Rc<Vec<AnnouncedReset>>,
     pub(super) provider_statuses: Rc<Vec<crate::provider_status::ProviderStatus>>,
     pub(super) palette: Palette,
     pub(super) accent: crate::theme::AccentRamp,
@@ -1367,6 +1367,9 @@ impl PopupRoot {
                     .instance(provider)
                     .is_some_and(|i| i.runtime_key() == runtime_key && i.enabled)
                 {
+                    if let Ok((crate::banked_reset::Outcome::Reset, _)) = &result {
+                        this.state.record_banked_reset_use(provider);
+                    }
                     if let Ok((_, Ok(limits))) = &result {
                         let _ = events.send(WorkerEvent::ProviderLimitsUpdated(
                             provider,

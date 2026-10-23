@@ -2908,3 +2908,27 @@ cmdpal-content-hint = The Dock writes a band as a title over a subtitle.
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = Up to 2 quotas: one fills the title and subtitle, two take a line each.
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = Banked reset credit
+
+# src/popup_window/ui/cards.rs
+before-when = Before { $when }
+
+# src/popup_window/ui/cards.rs
+time-ago = { $time } ago
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = New Codex banked reset info
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = A possible Codex reset is expected before { $when } (within { $countdown })
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }: possible reset before { $when } (within { $countdown })
+
+# src/popup_window/ui/cards.rs
+time-late = { $time } late

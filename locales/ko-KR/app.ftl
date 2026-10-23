@@ -2887,3 +2887,27 @@ cmdpal-content-hint = Dock은 밴드를 제목과 부제목으로 표시합니�
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = 최대 2개 한도: 하나를 선택하면 제목과 부제목에 표시하고, 두 개를 선택하면 한 줄씩 표시합니다.
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = 적립된 재설정
+
+# src/popup_window/ui/cards.rs
+before-when = { $when } 이전
+
+# src/popup_window/ui/cards.rs
+time-ago = { $time } 전
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = 새 Codex 적립 재설정 정보
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Codex 한도가 { $when } 이전에 재설정될 수 있습니다 (최대 { $countdown } 이내)
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }: { $when } 이전 재설정 가능 (최대 { $countdown } 이내)
+
+# src/popup_window/ui/cards.rs
+time-late = { $time } 지연

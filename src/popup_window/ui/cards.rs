@@ -208,9 +208,7 @@ impl PopupRoot {
                 };
                 row.px(px(4.0)).mt(px(8.0)).into_any_element()
             }
-            Card::ForcedResets(resets) => {
-                self.render_forced_resets(resets, self.card_inner_width(surface), window, cx)
-            }
+            Card::AnnouncedReset(row) => self.render_announced_reset(row, cx),
             Card::ProviderIncidents(status) => {
                 self.render_provider_incidents(status, self.card_inner_width(surface), window, cx)
             }
@@ -1773,93 +1771,171 @@ impl PopupRoot {
             .into_any_element()
     }
 
-    fn render_forced_resets(
+    /// One announced reset: a kind tile tinted by status, the title on the
+    /// full width, and kind/date with a status chip on the second line.
+    fn render_announced_reset(
         &mut self,
-        resets: &[&crate::reset_feed::ForcedReset],
-        available_width: f32,
-        window: &Window,
+        row: &AnnouncedResetRow<'_>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        use crate::reset_feed::{ResetKind, ResetTiming};
+        /// Edge padding, also used between the tile and the text.
+        const INSET: f32 = 12.0;
+        /// Title line + line gap + caption line, so the tile spans the text
+        /// block exactly and keeps the same inset on every side.
+        const TEXT_GAP: f32 = 2.0;
+        const TILE: f32 = 20.0 + TEXT_GAP + 16.0;
+        const TILE_GLYPH: f32 = 20.0;
+        const CHIP_GLYPH: f32 = 12.0;
+        const CARD_HEIGHT: f32 = INSET * 2.0 + TILE;
+
         let palette = self.palette.clone();
-        let metrics = self.metrics(window);
-        let hover_id = fx::key("forced-resets");
+        let reset = row.reset;
+        let local = reset.reset_at.with_timezone(&Local);
+        let when = format!(
+            "{}, {}",
+            crate::i18n::month_day(local),
+            TimeFormat::current().format_hm(local)
+        );
+        let date = match reset.timing {
+            ResetTiming::Exact => when,
+            ResetTiming::Before => crate::i18n::format("before-when", &[("when", when)]),
+        };
+        let (glyph, kind, fallback_label) = match reset.kind {
+            ResetKind::Forced => (
+                "fluent-arrow-reset",
+                crate::i18n::tr("tibo-reset"),
+                crate::i18n::tr("codex-limits"),
+            ),
+            ResetKind::Banked => (
+                "fluent-building-bank",
+                crate::i18n::tr("tibo-banked-reset"),
+                crate::i18n::tr("banked-reset-credit"),
+            ),
+        };
+        let label = reset
+            .label
+            .as_deref()
+            .filter(|label| !label.trim().is_empty())
+            .unwrap_or(fallback_label)
+            .to_owned();
+        let (color, chip_glyph, chip_text, title_color) = match row.phase {
+            AnnouncedResetPhase::Upcoming => {
+                let countdown = format_reset_in(Some(reset.reset_at));
+                let (glyph, text) = match reset.timing {
+                    ResetTiming::Exact => ("fluent-clock", countdown),
+                    ResetTiming::Before => ("fluent-hourglass", format!("≤ {countdown}")),
+                };
+                (palette.accent_text, glyph, text, palette.accent_text)
+            }
+            AnnouncedResetPhase::Missed => (
+                palette.caution,
+                "fluent-warning",
+                format_time_late(reset.reset_at),
+                palette.text_primary,
+            ),
+            AnnouncedResetPhase::Received(at) => (
+                palette.positive,
+                "fluent-checkmark-circle",
+                format_time_ago(at),
+                palette.text_primary,
+            ),
+        };
+
+        let hover_id = fx::key(("forced-reset", reset.id.as_str()));
         let hover = self.fx.toggle(
-            fx::key(("forced-resets-hover", hover_id)),
+            fx::key(("forced-reset-hover", hover_id)),
             self.hovered(hover_id),
             fx::FASTER,
         );
-        let mut rows = div().flex().flex_col().gap(px(8.0));
-        for reset in resets {
-            let local = reset.reset_at.with_timezone(&Local);
-            let date = format!(
-                "{}, {}",
-                crate::i18n::month_day(local),
-                TimeFormat::current().format_hm(local)
-            );
-            let label = reset
-                .label
-                .as_deref()
-                .filter(|label| !label.trim().is_empty())
-                .unwrap_or(crate::i18n::tr("codex-limits"))
-                .to_owned();
-            let row_id = fx::key(("forced-reset-row", reset.id.as_str()));
-            let tip: SharedString = if reset.source_url.is_some() {
-                crate::i18n::tr("open-announcement-source").into()
-            } else {
-                crate::i18n::tr("source-not-provided").into()
-            };
-            let source = reset.source_url.clone();
-            let countdown = format_reset_in(Some(reset.reset_at));
-            let kind = crate::i18n::tr("tibo-reset");
-            let leading_width = metrics.caption(kind).max(metrics.strong(&label));
-            let trailing_width = metrics
-                .caption(&date)
-                .max(metrics.status_row(crate::i18n::tr("resets-in"), &countdown));
-            let fits = TextMetrics::fits_split(available_width, leading_width, trailing_width);
-            rows = rows.child(
-                div()
-                    .id(eid(format!("forced-reset-{}", reset.id)))
-                    .on_hover(self.hover_listener(row_id, Some(tip), cx))
-                    .on_click(move |_: &ClickEvent, _, _| {
-                        if let Some(url) = source.as_deref()
-                            && let Err(error) = crate::updater::open_url(url)
-                        {
-                            crate::logger::info(format!(
-                                "failed to open forced reset source {url}: {error:#}"
-                            ));
-                        }
-                    })
-                    .child(components::adaptive_split(
-                        fits,
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(1.0))
-                            .child(caption(kind, palette.text_secondary))
-                            .child(components::body_strong(label, palette.accent_text)),
-                        div()
-                            .flex()
-                            .flex_col()
-                            .items_end()
-                            .gap(px(1.0))
-                            .child(card_metadata(date, &palette))
-                            .child(status_row(
-                                crate::i18n::tr("resets-in"),
-                                countdown,
-                                &palette,
-                            )),
-                    )),
-            );
-        }
-        let mut element = card(&palette)
-            .id("forced-resets")
+        let tip: SharedString = if reset.source_url.is_some() {
+            crate::i18n::tr("open-announcement-source").into()
+        } else {
+            crate::i18n::tr("source-not-provided").into()
+        };
+        let source = reset.source_url.clone();
+        let tile = div()
+            .size(px(TILE))
+            .flex_none()
+            .flex()
+            .items_center()
+            .justify_center()
+            // Concentric with the card corner across the inset.
+            .rounded(px((palette.card_radius - 2.0).max(4.0)))
+            .bg(color.opacity(0.14))
+            .child(icon(glyph, TILE_GLYPH, color));
+        let chip = div()
+            .flex()
+            .flex_row()
+            .flex_none()
+            .items_center()
+            .gap(px(4.0))
+            .px(px(6.0))
+            .rounded_full()
+            .bg(color.opacity(0.14))
+            .child(icon(chip_glyph, CHIP_GLYPH, color))
+            .child(nowrap(components::caption_strong(chip_text, color)));
+        let details = div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap(px(6.0))
+            .child(
+                nowrap(caption(format!("{kind} · {date}"), palette.text_secondary))
+                    .flex_1()
+                    .min_w_0(),
+            )
+            .child(chip);
+        let content = div()
             .relative()
-            .on_hover(self.hover_listener(hover_id, None, cx));
+            .p(px(INSET))
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap(px(INSET))
+            .child(tile)
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(px(TEXT_GAP))
+                    .child(nowrap(components::body_strong(label, title_color)))
+                    .child(details),
+            );
+        let mut element = card(&palette)
+            .id(eid(format!("forced-reset-{}", reset.id)))
+            .relative()
+            .on_hover(self.hover_listener(hover_id, Some(tip), cx))
+            .on_click(move |_: &ClickEvent, _, _| {
+                if let Some(url) = source.as_deref()
+                    && let Err(error) = crate::updater::open_url(url)
+                {
+                    crate::logger::info(format!(
+                        "failed to open forced reset source {url}: {error:#}"
+                    ));
+                }
+            });
         if let Some(layer) = components::hover_layer(&palette, hover, palette.card_radius - 1.0) {
             element = element.child(layer);
         }
-        element
-            .child(div().relative().p(px(12.0)).child(rows))
+        let element = element.child(content);
+        // An announcement that arrives while the Codex section is on screen
+        // grows in instead of pushing the cards below it down at once.
+        let reveal = self.fx.appear_in(
+            fx::key(("forced-reset-reveal", reset.id.as_str())),
+            fx::key(("provider-section", ProviderKind::Codex)),
+            fx::NORMAL,
+        );
+        if reveal >= 1.0 {
+            return element.into_any_element();
+        }
+        div()
+            .overflow_hidden()
+            .max_h(px(CARD_HEIGHT * reveal))
+            .opacity(reveal)
+            .child(element)
             .into_any_element()
     }
 }

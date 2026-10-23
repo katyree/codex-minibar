@@ -87,7 +87,8 @@ pub(crate) enum Card<'a> {
         name: &'a str,
         balance_microusd: Option<u64>,
     },
-    ForcedResets(Vec<&'a crate::reset_feed::ForcedReset>),
+    /// One announced Codex reset with this instance's reception state.
+    AnnouncedReset(AnnouncedResetRow<'a>),
     /// Ongoing incidents on the driver's public status page.
     ProviderIncidents(crate::provider_status::ProviderStatus),
     /// Claude's promotional cloud-session credits: a dollar balance that
@@ -192,7 +193,7 @@ pub(crate) fn provider_cards<'a>(
     is_first: bool,
     show_icon: bool,
     limits: &'a RateLimits,
-    forced_resets: &'a [crate::reset_feed::ForcedReset],
+    forced_resets: &'a [crate::reset_feed::AnnouncedReset],
     options: &CardOptions<'_>,
 ) -> Vec<Card<'a>> {
     let kind = provider.kind();
@@ -385,10 +386,11 @@ pub(crate) fn provider_cards<'a>(
         cards.push(spending_card(card_key(provider, "spending"), spending));
     }
     if kind == ProviderKind::Codex {
-        let upcoming = upcoming_forced_resets(forced_resets, options.now);
-        if !upcoming.is_empty() {
-            cards.push(Card::ForcedResets(upcoming));
-        }
+        cards.extend(
+            visible_announced_resets(forced_resets, provider, options.now)
+                .into_iter()
+                .map(Card::AnnouncedReset),
+        );
     }
     if visible(&resets_brick_id(kind))
         && (limits.available_reset_count() > 0 || options.keep_reset_card)
@@ -451,14 +453,62 @@ fn openrouter_account_usage<'a>(
     crate::openrouter::management_key_is_configured(account).then_some(Card::UsageLoading)
 }
 
-pub(crate) fn upcoming_forced_resets(
-    resets: &[crate::reset_feed::ForcedReset],
+/// How long a detected reset keeps its "Received" row.
+const RECEIVED_RESET_VISIBLE: ChronoDuration = ChronoDuration::hours(6);
+/// How long a reset that never arrived stays visible after its deadline.
+const MISSED_RESET_VISIBLE: ChronoDuration = ChronoDuration::hours(48);
+const MAX_ANNOUNCED_RESET_ROWS: usize = 3;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AnnouncedResetPhase {
+    /// The landing time (or deadline) is still ahead.
+    Upcoming,
+    /// The deadline passed and the account has not shown the reset yet.
+    Missed,
+    /// Detected on this account at the given time.
+    Received(DateTime<Utc>),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct AnnouncedResetRow<'a> {
+    pub reset: &'a crate::reset_feed::AnnouncedReset,
+    pub phase: AnnouncedResetPhase,
+}
+
+/// Rows for one Codex instance. A missed forced reset is hidden once a later
+/// forced reset reached the account, because the later one restored the
+/// same limits.
+pub(crate) fn visible_announced_resets(
+    resets: &[crate::reset_feed::AnnouncedReset],
+    provider: ProviderId,
     now: DateTime<Utc>,
-) -> Vec<&crate::reset_feed::ForcedReset> {
+) -> Vec<AnnouncedResetRow<'_>> {
+    use crate::reset_feed::ResetKind;
+    let instance = provider.id();
+    let superseded = |reset: &crate::reset_feed::AnnouncedReset| {
+        reset.kind == ResetKind::Forced
+            && resets.iter().any(|later| {
+                later.kind == ResetKind::Forced
+                    && later.reset_at > reset.reset_at
+                    && later.received.contains_key(instance)
+            })
+    };
     resets
         .iter()
-        .filter(|reset| reset.reset_at > now)
-        .take(2)
+        .filter_map(|reset| {
+            let phase = if let Some(at) = reset.received.get(instance) {
+                (now - *at <= RECEIVED_RESET_VISIBLE)
+                    .then_some(AnnouncedResetPhase::Received(*at))?
+            } else if reset.reset_at > now {
+                AnnouncedResetPhase::Upcoming
+            } else if now - reset.reset_at <= MISSED_RESET_VISIBLE && !superseded(reset) {
+                AnnouncedResetPhase::Missed
+            } else {
+                return None;
+            };
+            Some(AnnouncedResetRow { reset, phase })
+        })
+        .take(MAX_ANNOUNCED_RESET_ROWS)
         .collect()
 }
 

@@ -1986,3 +1986,27 @@ cmdpal-content-hint = Dock 将条带显示为标题和下方的副标题。
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = 最多 2 个额度：一个占用标题和副标题，两个各占一行。
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = 已储存的重置
+
+# src/popup_window/ui/cards.rs
+before-when = { $when } 之前
+
+# src/popup_window/ui/cards.rs
+time-ago = { $time }前
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = 新的 Codex 储存重置信息
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Codex 可能在 { $when } 之前重置（{ $countdown } 内）
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }：可能在 { $when } 之前重置（{ $countdown } 内）
+
+# src/popup_window/ui/cards.rs
+time-late = 延迟 { $time }

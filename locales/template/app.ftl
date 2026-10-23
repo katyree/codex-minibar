@@ -4282,3 +4282,35 @@ cmdpal-content-hint = { "" }
 # English source:
 # cmdpal-indicators-hint = Up to 2 quotas: one fills the title and subtitle, two take a line each.
 cmdpal-indicators-hint = { "" }
+
+# English source:
+# tibo-banked-reset = Tibo Banked Reset™
+tibo-banked-reset = { "" }
+
+# English source:
+# banked-reset-credit = Banked reset credit
+banked-reset-credit = { "" }
+
+# English source:
+# before-when = Before { $when }
+before-when = { "" }
+
+# English source:
+# time-ago = { $time } ago
+time-ago = { "" }
+
+# English source:
+# new-codex-banked-reset-info = New Codex banked reset info
+new-codex-banked-reset-info = { "" }
+
+# English source:
+# a-possible-codex-reset-is-expected-before-when-within-countdown = A possible Codex reset is expected before { $when } (within { $countdown })
+a-possible-codex-reset-is-expected-before-when-within-countdown = { "" }
+
+# English source:
+# label-possible-reset-before-when-within-countdown = { $label }: possible reset before { $when } (within { $countdown })
+label-possible-reset-before-when-within-countdown = { "" }
+
+# English source:
+# time-late = { $time } late
+time-late = { "" }

@@ -2007,3 +2007,27 @@ cmdpal-content-hint = El Dock muestra una banda como un título sobre un subtít
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = Hasta 2 cuotas: una ocupa el título y el subtítulo; dos, una línea cada una.
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = Restablecimiento guardado
+
+# src/popup_window/ui/cards.rs
+before-when = Antes de { $when }
+
+# src/popup_window/ui/cards.rs
+time-ago = hace { $time }
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = Nueva información de restablecimiento guardado de Codex
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Se espera un posible restablecimiento de Codex antes de { $when } (en menos de { $countdown })
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }: posible restablecimiento antes de { $when } (en menos de { $countdown })
+
+# src/popup_window/ui/cards.rs
+time-late = { $time } de retraso

@@ -2915,3 +2915,27 @@ cmdpal-content-hint = Док показывает бэнд как заголов
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = До 2 квот: одна занимает заголовок и подзаголовок, две — по строке.
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Банк-сброс Tibo™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = Сохранённый сброс
+
+# src/popup_window/ui/cards.rs
+before-when = До { $when }
+
+# src/popup_window/ui/cards.rs
+time-ago = { $time } назад
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = Новые сведения о сохранённом сбросе Codex
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Возможный сброс Codex ожидается до { $when } (в течение { $countdown })
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }: возможный сброс до { $when } (в течение { $countdown })
+
+# src/popup_window/ui/cards.rs
+time-late = опоздание { $time }

@@ -2888,3 +2888,27 @@ cmdpal-content-hint = Dock はバンドをタイトルとサブタイトルの 2
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = 最大 2 つのクォータ：1 つならタイトルとサブタイトルを使い、2 つなら 1 行ずつ表示します。
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = 保存済みリセット
+
+# src/popup_window/ui/cards.rs
+before-when = { $when } まで
+
+# src/popup_window/ui/cards.rs
+time-ago = { $time }前
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = 新しいCodex保存済みリセット情報
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Codex のリセットが { $when } までに行われる可能性があります（最大 { $countdown }）
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }: { $when } までにリセットの可能性（最大 { $countdown }）
+
+# src/popup_window/ui/cards.rs
+time-late = { $time }遅延
