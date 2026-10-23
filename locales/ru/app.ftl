@@ -2943,3 +2943,14 @@ label-possible-reset-before-when-within-countdown = { $label }: возможны
 
 # src/popup_window/ui/cards.rs
 time-late = опоздание { $time }
+
+# Floating usage panel
+popup-floating = Плавающая панель
+popup-floating-description = Панель остаётся открытой; перетаскивайте её за заголовок в любое место или на другой монитор.
+popup-always-on-top = Поверх всех окон
+popup-always-on-top-description = Показывать плавающую панель поверх других приложений.
+popup-position = Положение панели
+popup-position-description = Положение сохраняется между запусками.
+popup-reset-position = Сбросить положение
+popup-drag-header = Перетащите, чтобы переместить
+popup-close = Закрыть панель

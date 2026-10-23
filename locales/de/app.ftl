@@ -2937,3 +2937,14 @@ label-possible-reset-before-when-within-countdown = { $label }: möglicher Reset
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } verspätet
+
+# Floating usage panel
+popup-floating = Schwebendes Fenster
+popup-floating-description = Das Fenster bleibt offen. Ziehen Sie es an der Kopfzeile an eine andere Position oder auf einen anderen Monitor.
+popup-always-on-top = Immer im Vordergrund
+popup-always-on-top-description = Das schwebende Fenster über anderen Anwendungen anzeigen.
+popup-position = Fensterposition
+popup-position-description = Die Position wird zwischen Sitzungen gespeichert.
+popup-reset-position = Position zurücksetzen
+popup-drag-header = Zum Verschieben ziehen
+popup-close = Fenster schließen

@@ -17,7 +17,8 @@ use windows_sys::Win32::{
         },
         Gdi::{
             CreateRectRgn, CreateRoundRectRgn, GetMonitorInfoW, HMONITOR, MONITOR_DEFAULTTONEAREST,
-            MONITOR_DEFAULTTONULL, MONITORINFO, MonitorFromPoint, MonitorFromWindow, SetWindowRgn,
+            MONITOR_DEFAULTTONULL, MONITORINFO, MONITORINFOEXW, MonitorFromPoint,
+            MonitorFromWindow, SetWindowRgn,
         },
     },
     UI::{
@@ -26,20 +27,64 @@ use windows_sys::Win32::{
         Shell::{DefSubclassProc, SetWindowSubclass},
         WindowsAndMessaging::{
             EVENT_SYSTEM_FOREGROUND, FindWindowExW, GWL_EXSTYLE, GWL_STYLE, GetWindowLongPtrW,
-            GetWindowRect, HTCLIENT, HWND_TOPMOST, MA_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE,
-            SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
-            SWP_NOZORDER, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow,
-            WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_DISPLAYCHANGE, WM_MOUSEACTIVATE,
-            WM_NCCALCSIZE, WM_NCHITTEST, WM_SETTINGCHANGE, WS_CAPTION, WS_EX_APPWINDOW,
-            WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW,
-            WS_EX_TOPMOST, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
+            GetWindowRect, HTCAPTION, HTCLIENT, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST,
+            MA_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, SWP_FRAMECHANGED, SWP_NOACTIVATE,
+            SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SetForegroundWindow,
+            SetWindowLongPtrW, SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT,
+            WINEVENT_SKIPOWNPROCESS, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_ENTERSIZEMOVE,
+            WM_EXITSIZEMOVE, WM_MOUSEACTIVATE, WM_NCCALCSIZE, WM_NCHITTEST, WM_NCLBUTTONDBLCLK,
+            WM_SETTINGCHANGE, WS_CAPTION, WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
+            WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_MAXIMIZEBOX,
+            WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
         },
     },
 };
 
 const SUBCLASS_ID: usize = 0x434D_4250; // "CMBP"
+pub(crate) const SHOW_MESSAGE: u32 = 0x8000 + 0x034D;
 const DWMWCP_DONOTROUND: u32 = 1;
 const DWMNCRP_DISABLED: u32 = 1;
+
+thread_local! {
+    static POPUP_HWND: std::cell::Cell<HWND> = const { std::cell::Cell::new(std::ptr::null_mut()) };
+    static TOPMOST: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+    static DRAG_HEADER: std::cell::Cell<Option<Rect>> = const { std::cell::Cell::new(None) };
+    static MOVING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+pub(crate) fn set_drag_header(rect: Option<Rect>) {
+    DRAG_HEADER.set(rect);
+}
+
+/// Outside GPUI borrows: changing the z-order can send synchronous messages.
+pub(crate) fn set_topmost(hwnd: HWND, enabled: bool) {
+    if TOPMOST.replace(enabled) == enabled {
+        return;
+    }
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            if enabled {
+                HWND_TOPMOST
+            } else {
+                HWND_NOTOPMOST
+            },
+            0,
+            0,
+            0,
+            0,
+            SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE,
+        );
+    }
+}
+
+fn insertion_order(hwnd: HWND) -> HWND {
+    if POPUP_HWND.get() == hwnd && !TOPMOST.get() {
+        HWND_TOP
+    } else {
+        HWND_TOPMOST
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Rect {
@@ -94,11 +139,47 @@ unsafe extern "system" fn popup_subclass_proc(
     _data: usize,
 ) -> LRESULT {
     match message {
+        SHOW_MESSAGE => {
+            crate::popup::show_near_cursor();
+            0
+        }
         // The client area is the entire window: no frame, no resize border,
         // no 1px Win11 top inset. GPUI then lays out over the exact HWND
         // rectangle that the region and outside-click math use.
         WM_NCCALCSIZE => 0,
-        WM_NCHITTEST => HTCLIENT as LRESULT,
+        WM_NCHITTEST => {
+            let origin = window_rect(hwnd);
+            let x = (lparam as u32 as u16 as i16) as i32 - origin.left;
+            let y = ((lparam as u32 >> 16) as u16 as i16) as i32 - origin.top;
+            if DRAG_HEADER
+                .get()
+                .is_some_and(|r| x >= r.left && x < r.right && y >= r.top && y < r.bottom)
+            {
+                HTCAPTION as LRESULT
+            } else {
+                HTCLIENT as LRESULT
+            }
+        }
+        // A double click on the drag grip must never maximize a tray panel.
+        WM_NCLBUTTONDBLCLK => 0,
+        WM_ENTERSIZEMOVE => {
+            MOVING.set(true);
+            crate::popup::set_dragging(true);
+            unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
+        }
+        WM_EXITSIZEMOVE => {
+            MOVING.set(false);
+            crate::popup::set_dragging(false);
+            crate::popup_window::send_command(crate::popup_window::PopupCommand::Moved);
+            unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
+        }
+        WM_DPICHANGED => {
+            let result = unsafe { DefSubclassProc(hwnd, message, wparam, lparam) };
+            if !MOVING.get() {
+                crate::popup_window::send_command(crate::popup_window::PopupCommand::Reposition);
+            }
+            result
+        }
         WM_DISPLAYCHANGE | WM_SETTINGCHANGE => {
             crate::popup_window::send_command(crate::popup_window::PopupCommand::Reposition);
             unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
@@ -112,6 +193,7 @@ unsafe extern "system" fn popup_subclass_proc(
 /// Must be called outside any GPUI borrow: `SWP_FRAMECHANGED` makes the
 /// window recompute its client area, which GPUI observes via `WM_SIZE`.
 pub(crate) fn configure(hwnd: HWND) {
+    POPUP_HWND.set(hwnd);
     unsafe {
         SetWindowSubclass(hwnd, Some(popup_subclass_proc), SUBCLASS_ID, 0);
     }
@@ -214,7 +296,7 @@ unsafe extern "system" fn foreground_changed(
     _time: u32,
 ) {
     // SetWindowPos re-enters GPUI; defer to the foreground command task.
-    if crate::popup::is_visible() {
+    if crate::popup::is_visible() && TOPMOST.get() {
         crate::popup_window::send_command(crate::popup_window::PopupCommand::Raise);
     }
 }
@@ -222,6 +304,9 @@ unsafe extern "system" fn foreground_changed(
 /// Restore the visible popup to the top of the topmost band. Outside any GPUI
 /// borrow only.
 pub(crate) fn raise(hwnd: HWND) {
+    if !TOPMOST.get() {
+        return;
+    }
     unsafe {
         SetWindowPos(
             hwnd,
@@ -258,6 +343,40 @@ pub(crate) fn monitor_for_point(x: i32, y: i32) -> Monitor {
             dpi: monitor_dpi(monitor),
         }
     }
+}
+
+fn monitor_name(handle: HMONITOR) -> String {
+    let mut info: MONITORINFOEXW = unsafe { std::mem::zeroed() };
+    info.monitorInfo.cbSize = size_of::<MONITORINFOEXW>() as u32;
+    unsafe { GetMonitorInfoW(handle, &mut info as *mut _ as *mut MONITORINFO) };
+    let len = info
+        .szDevice
+        .iter()
+        .position(|c| *c == 0)
+        .unwrap_or(info.szDevice.len());
+    String::from_utf16_lossy(&info.szDevice[..len])
+}
+
+pub(crate) fn save_position(x: i32, y: i32) -> crate::settings::PopupPosition {
+    let monitor = monitor_for_point(x, y);
+    let handle = unsafe { MonitorFromPoint(POINT { x, y }, MONITOR_DEFAULTTONEAREST) };
+    crate::settings::PopupPosition {
+        monitor: monitor_name(handle),
+        x_dip: (f64::from(x - monitor.work.left) / monitor.scale()).round() as i32,
+        y_dip: (f64::from(y - monitor.work.top) / monitor.scale()).round() as i32,
+        screen_x: x,
+        screen_y: y,
+    }
+}
+
+pub(crate) fn restore_position(position: &crate::settings::PopupPosition) -> (Monitor, i32, i32) {
+    // Restore the exact saved screen origin. Monitor/work-area changes must
+    // not silently reposition a normal floating window.
+    (
+        monitor_for_point(position.screen_x, position.screen_y),
+        position.screen_x,
+        position.screen_y,
+    )
 }
 
 /// The frame of the primary or secondary taskbar that lives on `monitor`.
@@ -332,7 +451,7 @@ pub(crate) fn place(hwnd: HWND, rect: Rect) {
     unsafe {
         SetWindowPos(
             hwnd,
-            HWND_TOPMOST,
+            insertion_order(hwnd),
             rect.left,
             rect.top,
             rect.width().max(1),
@@ -349,7 +468,7 @@ pub(crate) fn show(hwnd: HWND) {
         ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         SetWindowPos(
             hwnd,
-            HWND_TOPMOST,
+            insertion_order(hwnd),
             0,
             0,
             0,

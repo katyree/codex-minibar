@@ -2936,3 +2936,14 @@ label-possible-reset-before-when-within-countdown = { $label }: possible reset b
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } late
+
+# Floating usage panel
+popup-floating = Floating panel
+popup-floating-description = Keep the panel open and drag its header to another position or monitor.
+popup-always-on-top = Always on top
+popup-always-on-top-description = Keep the floating panel above other applications.
+popup-position = Panel position
+popup-position-description = The position is remembered between sessions.
+popup-reset-position = Reset position
+popup-drag-header = Drag to move
+popup-close = Close panel

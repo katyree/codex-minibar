@@ -2014,3 +2014,14 @@ label-possible-reset-before-when-within-countdown = { $label }：可能在 { $wh
 
 # src/popup_window/ui/cards.rs
 time-late = 延迟 { $time }
+
+# Floating usage panel
+popup-floating = 浮动面板
+popup-floating-description = 保持面板打开，拖动标题栏可移动到其他位置或显示器。
+popup-always-on-top = 始终置顶
+popup-always-on-top-description = 将浮动面板显示在其他应用上方。
+popup-position = 面板位置
+popup-position-description = 下次启动时恢复面板位置。
+popup-reset-position = 重置位置
+popup-drag-header = 拖动以移动
+popup-close = 关闭面板

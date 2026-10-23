@@ -90,6 +90,8 @@ pub(crate) enum PopupCommand {
     StartHomeEditing,
     AppearanceChanged,
     Reposition,
+    /// Persist a completed native move, then rebuild the host for its new DPI.
+    Moved,
     /// Another window took the foreground; restore the popup to the top of
     /// the topmost band if it is visible.
     Raise,

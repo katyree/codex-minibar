@@ -2092,6 +2092,17 @@ impl Default for NotificationSettings {
     }
 }
 
+/// Floating panel origin in screen pixels. Monitor/DIP metadata is retained
+/// for settings compatibility; restoring never adjusts the screen coordinates.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PopupPosition {
+    pub monitor: String,
+    pub x_dip: i32,
+    pub y_dip: i32,
+    pub screen_x: i32,
+    pub screen_y: i32,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -2181,6 +2192,10 @@ pub struct Settings {
     pub show_edit_home_button: bool,
     /// Footer pin: outside clicks and Escape leave the popup open.
     pub popup_pinned: bool,
+    /// Detached panel with a draggable header and top-anchored content.
+    pub popup_floating: bool,
+    pub popup_always_on_top: bool,
+    pub popup_position: Option<PopupPosition>,
     /// System-wide shortcut that shows or hides the popup. None leaves every
     /// key combination to other applications.
     pub popup_hotkey: Option<crate::hotkey::Hotkey>,
@@ -2260,6 +2275,9 @@ impl Default for Settings {
             show_account_name: false,
             show_edit_home_button: true,
             popup_pinned: false,
+            popup_floating: false,
+            popup_always_on_top: true,
+            popup_position: None,
             popup_hotkey: None,
             // An empty list intentionally means "show the ordinary app icon".
             tray_widgets: Vec::new(),
@@ -4437,6 +4455,26 @@ enabled = ["codex", "claude"]
         let saved = loaded.instance(provider).unwrap();
         assert_eq!(saved.openrouter, work.openrouter);
         assert_eq!(saved.name, "Work account");
+    }
+
+    #[test]
+    fn floating_panel_settings_default_to_tray_and_round_trip() {
+        let mut settings: Settings = toml::from_str("onboarding_completed = true").unwrap();
+        assert!(!settings.popup_floating);
+        assert!(settings.popup_always_on_top);
+        assert!(settings.popup_position.is_none());
+        settings.popup_floating = true;
+        settings.popup_pinned = true;
+        settings.popup_always_on_top = false;
+        settings.popup_position = Some(PopupPosition {
+            monitor: r"\\.\DISPLAY2".into(),
+            x_dip: 140,
+            y_dip: 220,
+            screen_x: -1800,
+            screen_y: 330,
+        });
+        let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored, settings);
     }
 
     #[test]

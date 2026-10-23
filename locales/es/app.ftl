@@ -2035,3 +2035,14 @@ label-possible-reset-before-when-within-countdown = { $label }: posible restable
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } de retraso
+
+# Floating usage panel
+popup-floating = Panel flotante
+popup-floating-description = Mantén el panel abierto y arrastra su cabecera a otra posición o monitor.
+popup-always-on-top = Siempre visible
+popup-always-on-top-description = Mantener el panel flotante encima de otras aplicaciones.
+popup-position = Posición del panel
+popup-position-description = La posición se recuerda entre sesiones.
+popup-reset-position = Restablecer posición
+popup-drag-header = Arrastra para mover
+popup-close = Cerrar panel

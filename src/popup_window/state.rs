@@ -431,6 +431,9 @@ pub(crate) struct UiState {
     pub(super) show_account_name: bool,
     pub(super) show_edit_home_button: bool,
     pub(super) popup_pinned: bool,
+    pub(super) popup_floating: bool,
+    pub(super) popup_always_on_top: bool,
+    pub(super) popup_position: Option<crate::settings::PopupPosition>,
     /// Every configured instance in display order, enabled or not.
     pub(super) instances: Vec<ProviderInstance>,
     pub(super) popup_tab_mode: PopupTabMode,
@@ -483,6 +486,9 @@ impl Default for UiState {
             show_account_name: false,
             show_edit_home_button: true,
             popup_pinned: false,
+            popup_floating: false,
+            popup_always_on_top: true,
+            popup_position: None,
             instances: Settings::default().instances,
             popup_tab_mode: PopupTabMode::default(),
             grouped_tab_selection: Default::default(),
@@ -542,6 +548,9 @@ impl UiState {
         self.show_account_name = settings.show_account_name;
         self.show_edit_home_button = settings.show_edit_home_button;
         self.popup_pinned = settings.popup_pinned;
+        self.popup_floating = settings.popup_floating;
+        self.popup_always_on_top = settings.popup_always_on_top;
+        self.popup_position = settings.popup_position.clone();
         self.instances = settings.instances.clone();
         self.popup_tab_mode = settings.popup_tab_mode;
         self.grouped_tab_selection = settings.grouped_tab_selection.clone();

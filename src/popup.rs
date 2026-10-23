@@ -43,9 +43,10 @@ static POPUP_CLOSING: AtomicBool = AtomicBool::new(false);
 static BUTTON_WAS_DOWN: AtomicBool = AtomicBool::new(false);
 static ESCAPE_WAS_DOWN: AtomicBool = AtomicBool::new(false);
 static IGNORE_OUTSIDE_UNTIL_MS: AtomicI64 = AtomicI64::new(0);
-/// While either is set, outside clicks and Escape do not dismiss the popup.
+/// Independent owners of popup dismissal suppression.
 static REVEAL_PINNED: AtomicBool = AtomicBool::new(false);
 static USER_PINNED: AtomicBool = AtomicBool::new(false);
+static DRAGGING: AtomicBool = AtomicBool::new(false);
 static BOTTOM_BAR_SIZE: AtomicU8 = AtomicU8::new(BottomBarSize::Comfortable.index() as u8);
 static CORNER_RADIUS_DIP: AtomicI32 = AtomicI32::new(WINDOW_CORNER_RADIUS_DIP);
 static POPUP_BACKGROUND_MATERIAL: AtomicU8 =
@@ -103,7 +104,11 @@ pub(crate) fn is_user_pinned() -> bool {
 
 /// Outside clicks and Escape leave the popup open.
 pub(crate) fn is_pinned() -> bool {
-    is_reveal_pinned() || is_user_pinned()
+    is_reveal_pinned() || is_user_pinned() || DRAGGING.load(Ordering::SeqCst)
+}
+
+pub(crate) fn set_dragging(dragging: bool) {
+    DRAGGING.store(dragging, Ordering::SeqCst);
 }
 
 /// GPUI thread only: the capsule is now visible, so the press that opened it

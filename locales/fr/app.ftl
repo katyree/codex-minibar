@@ -2944,3 +2944,14 @@ label-possible-reset-before-when-within-countdown = { $label } : réinitialisati
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } de retard
+
+# Floating usage panel
+popup-floating = Panneau flottant
+popup-floating-description = Gardez le panneau ouvert et faites glisser son en-tête vers une autre position ou un autre écran.
+popup-always-on-top = Toujours au premier plan
+popup-always-on-top-description = Afficher le panneau flottant au-dessus des autres applications.
+popup-position = Position du panneau
+popup-position-description = La position est conservée entre les sessions.
+popup-reset-position = Réinitialiser la position
+popup-drag-header = Faire glisser pour déplacer
+popup-close = Fermer le panneau

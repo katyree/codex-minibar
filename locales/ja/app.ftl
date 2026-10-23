@@ -2916,3 +2916,14 @@ label-possible-reset-before-when-within-countdown = { $label }: { $when } まで
 
 # src/popup_window/ui/cards.rs
 time-late = { $time }遅延
+
+# Floating usage panel
+popup-floating = フローティングパネル
+popup-floating-description = パネルを開いたまま、ヘッダーをドラッグして位置やモニターを変更できます。
+popup-always-on-top = 常に最前面
+popup-always-on-top-description = フローティングパネルを他のアプリより手前に表示します。
+popup-position = パネルの位置
+popup-position-description = 位置は次回の起動時にも復元されます。
+popup-reset-position = 位置をリセット
+popup-drag-header = ドラッグして移動
+popup-close = パネルを閉じる

@@ -2915,3 +2915,14 @@ label-possible-reset-before-when-within-countdown = { $label }: { $when } 이전
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } 지연
+
+# Floating usage panel
+popup-floating = 플로팅 패널
+popup-floating-description = 패널을 열어 두고 헤더를 드래그하여 위치나 모니터를 변경합니다.
+popup-always-on-top = 항상 위에 표시
+popup-always-on-top-description = 플로팅 패널을 다른 앱 위에 표시합니다.
+popup-position = 패널 위치
+popup-position-description = 세션 간에 위치가 저장됩니다.
+popup-reset-position = 위치 초기화
+popup-drag-header = 드래그하여 이동
+popup-close = 패널 닫기

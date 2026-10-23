@@ -130,6 +130,10 @@ pub(super) struct Host {
     pub(super) monitor: Option<super::Monitor>,
     /// The work-area corner the popup stands in.
     pub(super) placement: super::Placement,
+    #[cfg(windows)]
+    pub(super) floating_rect: Option<super::win32::Rect>,
+    pub(super) header_height: f32,
+    reopen_after_hide: bool,
     pub(super) phase: Phase,
     pub(super) height: Spring,
     pub(super) width: Spring,
@@ -153,6 +157,10 @@ impl Host {
             backdrop: None,
             monitor: None,
             placement: super::Placement::default(),
+            #[cfg(windows)]
+            floating_rect: None,
+            header_height: 0.0,
+            reopen_after_hide: false,
             phase: Phase::Hidden,
             height: Spring::at(f64::from(INITIAL_HEIGHT)),
             width: Spring::at(f64::from(crate::popup::POPUP_WIDTH)),
@@ -179,6 +187,11 @@ impl Host {
     /// Wide two-column layout fits on the monitor that owns the popup.
     pub(super) fn wide_available(&self) -> bool {
         self.monitor.is_none_or(|monitor| {
+            #[cfg(windows)]
+            if let Some(rect) = self.floating_rect {
+                return f64::from(rect.width() - crate::popup::EDGE_MARGIN_PX) / monitor.scale()
+                    >= f64::from(crate::popup::POPUP_WIDE_WIDTH);
+            }
             f64::from(monitor.bounds.width() - crate::popup::EDGE_MARGIN_PX * 2) / monitor.scale()
                 >= f64::from(crate::popup::POPUP_WIDE_WIDTH)
         })
@@ -188,8 +201,11 @@ impl Host {
         self.monitor.map_or(4096.0, |monitor| {
             #[cfg(windows)]
             {
-                (f64::from(super::host_rect(monitor, self.placement).height()) / monitor.scale())
-                    as f32
+                (f64::from(
+                    self.floating_rect
+                        .unwrap_or_else(|| super::host_rect(monitor, self.placement))
+                        .height(),
+                ) / monitor.scale()) as f32
             }
             #[cfg(not(windows))]
             {
@@ -768,20 +784,14 @@ impl PopupRoot {
             let rect = super::win32::window_rect(hwnd);
             (rect.right - 1, rect.bottom - 1)
         });
-        let monitor = super::win32::monitor_for_point(anchor.0, anchor.1);
-        self.host.monitor = Some(monitor);
-        self.host.scale = monitor.scale() as f32;
-        // An open popup stays on its side rather than jumping across.
-        if !already_visible {
-            self.host.placement = super::Placement::for_anchor(monitor, anchor, beside);
-        }
+        let rect = self.prepare_geometry(Some(anchor), beside);
+        self.remember_floating_origin(rect, cx);
         // The system accent can change while the popup is hidden.
         self.accent = theme::accent_ramp(self.ui.accent_color);
         self.refresh_palette(window);
         self.limits = Rc::new(self.state.current_limits());
         self.forced_resets = Rc::new(self.state.current_forced_resets());
         self.provider_statuses = Rc::new(self.state.current_provider_statuses());
-        let rect = super::host_rect(monitor, self.host.placement);
         if !already_visible {
             let closing_offset = match self.host.phase {
                 Phase::Closing(started, from) => Some(closing_offset(
@@ -893,6 +903,9 @@ impl PopupRoot {
     }
 
     pub(crate) fn begin_hide(&mut self, cx: &mut Context<Self>) {
+        self.host.reopen_after_hide = false;
+        #[cfg(windows)]
+        super::win32::set_drag_header(None);
         match self.host.phase {
             Phase::Hidden | Phase::Prewarm | Phase::Closing(..) => {}
             _ => {
@@ -910,6 +923,7 @@ impl PopupRoot {
     }
 
     fn finish_hide(&mut self, cx: &mut Context<Self>) {
+        let reopen = std::mem::take(&mut self.host.reopen_after_hide);
         self.host.phase = Phase::Hidden;
         #[cfg(windows)]
         if let Some(backdrop) = &mut self.host.backdrop {
@@ -964,12 +978,149 @@ impl PopupRoot {
             .detach();
         }
         self.host.last_region = None;
+        if reopen {
+            send_command(PopupCommand::Show {
+                anchor: None,
+                beside: false,
+            });
+        }
     }
 
     // ----- geometry ---------------------------------------------------------
 
+    /// Re-anchor an open panel through its normal exit/entrance motion.
+    /// Explicit Hide commands cancel the queued reopen in begin_hide.
+    #[cfg(windows)]
+    pub(super) fn animate_reposition(&mut self, cx: &mut Context<Self>) -> bool {
+        // Resizing a floating window preserves its live HWND origin.
+        if self.ui.popup_floating
+            && self.host.floating_rect.is_some()
+            && self.ui.popup_position.is_some()
+        {
+            return false;
+        }
+        if self.host.reopen_after_hide {
+            return true;
+        }
+        if super::animations_enabled(&self.ui)
+            && !crate::popup::is_reveal_pinned()
+            && matches!(self.host.phase, Phase::Open | Phase::Opening(_))
+        {
+            self.begin_hide(cx);
+            self.host.reopen_after_hide = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    #[cfg(windows)]
+    pub(super) fn prepare_geometry(
+        &mut self,
+        anchor: Option<(i32, i32)>,
+        beside: bool,
+    ) -> super::win32::Rect {
+        let preserve_corner = anchor.is_some()
+            && matches!(self.host.phase, Phase::Open | Phase::Opening(_))
+            && self.host.floating_rect.is_none();
+        let origin = self.host.hwnd.map(super::win32::window_rect);
+        let anchor =
+            anchor.unwrap_or_else(|| origin.map_or((0, 0), |r| (r.right - 1, r.bottom - 1)));
+        let (monitor, rect) = if self.ui.popup_floating {
+            let live_origin = origin.filter(|_| {
+                self.host.floating_rect.is_some()
+                    && self.ui.popup_position.is_some()
+                    && matches!(
+                        self.host.phase,
+                        Phase::Open | Phase::Opening(_) | Phase::Closing(..)
+                    )
+            });
+            let (monitor, x, y) = live_origin
+                .map(|rect| {
+                    let x = rect.left + crate::popup::EDGE_MARGIN_PX;
+                    (super::win32::monitor_for_point(x, rect.top), x, rect.top)
+                })
+                .or_else(|| {
+                    self.ui
+                        .popup_position
+                        .as_ref()
+                        .map(super::win32::restore_position)
+                })
+                .unwrap_or_else(|| {
+                    let monitor = super::win32::monitor_for_point(anchor.0, anchor.1);
+                    let rect = super::host_rect(
+                        monitor,
+                        super::Placement {
+                            left: false,
+                            top: true,
+                        },
+                    );
+                    (monitor, rect.left + crate::popup::EDGE_MARGIN_PX, rect.top)
+                });
+            self.host.placement = super::Placement {
+                left: true,
+                top: true,
+            };
+            let rect = super::floating_host_rect(monitor, x, y, self.ui.popup_two_columns);
+            self.host.floating_rect = Some(rect);
+            (monitor, rect)
+        } else {
+            let monitor = if preserve_corner {
+                self.host
+                    .monitor
+                    .unwrap_or_else(|| super::win32::monitor_for_point(anchor.0, anchor.1))
+            } else {
+                super::win32::monitor_for_point(anchor.0, anchor.1)
+            };
+            if !preserve_corner {
+                self.host.placement = super::Placement::for_anchor(monitor, anchor, beside);
+            }
+            self.host.floating_rect = None;
+            (monitor, super::host_rect(monitor, self.host.placement))
+        };
+        self.host.monitor = Some(monitor);
+        self.host.scale = monitor.scale() as f32;
+        rect
+    }
+
+    #[cfg(windows)]
+    pub(super) fn save_floating_position(&mut self, cx: &mut Context<Self>) {
+        if !self.ui.popup_floating {
+            return;
+        }
+        let Some(hwnd) = self.host.hwnd else {
+            return;
+        };
+        let rect = super::win32::window_rect(hwnd);
+        self.persist_floating_origin(rect, cx);
+    }
+
+    #[cfg(windows)]
+    pub(super) fn remember_floating_origin(
+        &mut self,
+        rect: super::win32::Rect,
+        cx: &mut Context<Self>,
+    ) {
+        if self.ui.popup_floating && self.ui.popup_position.is_none() {
+            self.persist_floating_origin(rect, cx);
+        }
+    }
+
+    #[cfg(windows)]
+    fn persist_floating_origin(&mut self, rect: super::win32::Rect, cx: &mut Context<Self>) {
+        // Floating capsules always start at the host's left margin and top.
+        let position =
+            super::win32::save_position(rect.left + crate::popup::EDGE_MARGIN_PX, rect.top);
+        let saved = position.clone();
+        self.persist(
+            cx,
+            move |ui| ui.popup_position = Some(position),
+            move |s| s.popup_position = Some(saved),
+        );
+    }
+
     pub(super) fn two_columns(&self) -> bool {
-        self.ui.popup_two_columns && self.host.wide_available()
+        self.ui.popup_two_columns && (self.ui.popup_floating || self.host.wide_available())
     }
 
     /// GPUI's view cache keys include bounds/mask/text, but not inherited
@@ -1024,7 +1175,7 @@ impl PopupRoot {
     }
 
     pub(super) fn chrome_height(&self) -> f32 {
-        self.footer_height() + self.profile_height + CHROME_INSET * 2.0
+        self.footer_height() + self.profile_height + self.host.header_height + CHROME_INSET * 2.0
     }
 
     fn target_profile_strip_height(&self) -> f32 {
@@ -1040,7 +1191,10 @@ impl PopupRoot {
     }
 
     fn target_height(&self, view: PopupView) -> f32 {
-        let chrome = self.footer_height() + self.target_profile_strip_height() + CHROME_INSET * 2.0;
+        let chrome = self.footer_height()
+            + self.target_profile_strip_height()
+            + self.host.header_height
+            + CHROME_INSET * 2.0;
         // Usage loads asynchronously and its content height swings with the
         // range and provider count; a fixed full-height shell never jumps.
         if view == PopupView::Usage {
@@ -1195,6 +1349,23 @@ impl PopupRoot {
                 (left, top, right, bottom)
             };
             let surface = pixels(x, y, width, height);
+            super::win32::set_drag_header(
+                (self.ui.popup_floating && self.host.phase == Phase::Open).then(|| {
+                    let (left, top, right, bottom) = pixels(
+                        x + CHROME_INSET,
+                        y + CHROME_INSET,
+                        (width - CHROME_INSET * 2.0 - super::footer::FLOATING_HEADER_ACTIONS_WIDTH)
+                            .max(0.0),
+                        self.host.header_height,
+                    );
+                    super::win32::Rect {
+                        left,
+                        top,
+                        right,
+                        bottom,
+                    }
+                }),
+            );
             let (left, top, right, bottom) = pixels(clip.0, clip.1, clip.2, clip.3);
             let radius = (crate::popup::corner_radius_dip() as f32 * scale).round() as i32;
             let region = (left, top, right, bottom, radius);
@@ -1214,7 +1385,7 @@ impl PopupRoot {
             }
             // The clip can stay put while the capsule resizes inside it;
             // outside clicks still go by the visible capsule.
-            if region_changed || self.host.last_surface != Some(surface) {
+            if self.ui.popup_floating || region_changed || self.host.last_surface != Some(surface) {
                 self.host.last_surface = Some(surface);
                 let (left, top, right, bottom) = surface;
                 let origin = super::win32::window_rect(hwnd);
@@ -1425,6 +1596,22 @@ impl PopupRoot {
             move |ui| ui.popup_pinned = pinned,
             move |settings| settings.popup_pinned = pinned,
         );
+    }
+
+    pub(super) fn toggle_two_columns(&mut self, cx: &mut Context<Self>) {
+        let enabled = !self.ui.popup_two_columns;
+        self.persist(
+            cx,
+            move |ui| ui.popup_two_columns = enabled,
+            move |settings| settings.popup_two_columns = enabled,
+        );
+        // The optimistic snapshot already contains the new value when the
+        // settings broadcast returns. Expand the technical host now so Home
+        // and Usage are not clipped. When shrinking, keep the larger host
+        // until the normal lifecycle resizes it so the width spring can finish.
+        if enabled {
+            send_command(PopupCommand::Reposition);
+        }
     }
 
     pub(super) fn open_settings(&mut self) {
@@ -1661,6 +1848,15 @@ impl Render for PopupRoot {
             self.profile_layout = profile_layout;
         }
 
+        self.host.header_height = self.fx.value(
+            fx::key("floating-header-height"),
+            if self.ui.popup_floating {
+                super::footer::FLOATING_HEADER_HEIGHT
+            } else {
+                0.0
+            },
+            fx::NORMAL,
+        );
         let (capsule_w, capsule_h, offset) = self.step_motion(now, cx);
         // Closing can finish inside step_motion. Submit an empty last frame,
         // so GPUI also drops scene listeners holding chart/snapshot Arcs.
@@ -1789,17 +1985,31 @@ impl Render for PopupRoot {
                 element.right(px(viewport_w - capsule_x - capsule_w + CHROME_INSET))
             }
         };
-        let footer = chrome_y(chrome_x(div().id("popup-pinned-footer")), 0.0)
-            .absolute()
-            .w(px(chrome_width))
-            .h(px(self.footer_height()))
-            .child(self.render_footer(capsule_w, window, cx));
+        let footer = chrome_y(
+            chrome_x(div().id("popup-pinned-footer")),
+            self.host.header_height,
+        )
+        .absolute()
+        .w(px(chrome_width))
+        .h(px(self.footer_height()))
+        .child(self.render_footer(capsule_w, window, cx));
         let mut chrome = vec![footer.into_any_element()];
+        if self.host.header_height > 0.0 {
+            chrome.push(
+                chrome_y(chrome_x(div().id("floating-drag-header")), 0.0)
+                    .absolute()
+                    .w(px(chrome_width))
+                    .h(px(self.host.header_height))
+                    .overflow_hidden()
+                    .child(self.render_floating_header(cx))
+                    .into_any_element(),
+            );
+        }
         if self.profile_height > 0.001 {
             chrome.push(
                 chrome_y(
                     chrome_x(div().id("popup-pinned-profiles")),
-                    self.footer_height(),
+                    self.footer_height() + self.host.header_height,
                 )
                 .absolute()
                 .w(px(chrome_width))
