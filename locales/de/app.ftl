@@ -296,8 +296,8 @@ updated = Aktualisiert{ " " }
 refresh-last-updated-relative = Aktualisieren · Zuletzt aktualisiert: { $relative }
 
 # src/popup_window/ui/footer.rs
-popup-pin = Geöffnet lassen
-popup-unpin = Beim Klicken außerhalb schließen
+popup-pin = Im Vordergrund anheften und offen halten
+popup-unpin = Lösen und bei Fokusverlust schließen
 
 # src/popup_window/ui/home.rs
 edit-home = Startseite bearbeiten
@@ -2937,3 +2937,17 @@ label-possible-reset-before-when-within-countdown = { $label }: möglicher Reset
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } verspätet
+
+# Floating usage panel
+popup-floating = Schwebendes Fenster
+popup-floating-description = Das Fenster bleibt offen. Ziehen Sie es an der Kopfzeile an eine andere Position oder auf einen anderen Monitor.
+popup-always-on-top = Immer im Vordergrund
+popup-always-on-top-description = Das Fenster über anderen Anwendungen anzeigen und beim App-Wechsel offen halten.
+popup-position = Fensterposition
+popup-position-description = Die Position wird zwischen Sitzungen gespeichert.
+popup-reset-position = Position zurücksetzen
+popup-drag-header = Zum Verschieben ziehen
+popup-close = Fenster schließen
+
+show-popup-action-bar = Aktionsleiste im Popup anzeigen
+show-popup-action-bar-description = App-Titel und Aktionen im normalen Popup anzeigen. Schwebende Fenster zeigen diese Leiste immer.

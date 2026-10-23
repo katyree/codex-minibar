@@ -7,18 +7,15 @@ mod platform {
 
     use anyhow::{Context, Result};
     use windows_sys::Win32::{
-        Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND, POINT, RECT},
-        Graphics::Gdi::{GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint},
+        Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND},
         System::Threading::CreateMutexW,
         UI::WindowsAndMessaging::{
-            FindWindowW, GetCursorPos, GetWindowRect, HWND_TOPMOST, SW_RESTORE, SWP_NOACTIVATE,
-            SWP_NOSIZE, SWP_SHOWWINDOW, SetForegroundWindow, SetWindowPos, ShowWindow,
+            FindWindowW, PostMessageW, SW_RESTORE, SetForegroundWindow, ShowWindow,
         },
     };
 
     const MUTEX_NAME: &str = "Local\\CodexMinibar.9F89F5E9-770D-41AA-879F-9B15C12A2E6A";
     const POPUP_TITLE: &str = "Codex Minibar";
-    const EDGE_MARGIN: i32 = 20;
 
     static HOLDER: OnceLock<Mutex<Option<isize>>> = OnceLock::new();
 
@@ -80,58 +77,15 @@ mod platform {
         let Some(hwnd) = hwnd else { return };
 
         unsafe {
-            ShowWindow(hwnd, SW_RESTORE);
             if hwnd == find_window(POPUP_TITLE).unwrap_or(ptr::null_mut()) {
-                position_popup_at_cursor(hwnd);
+                // Let the owning process restore its host, saved position and
+                // z-order instead of moving a parked 1px HWND from this process.
+                PostMessageW(hwnd, crate::popup_window::ui::win32::SHOW_MESSAGE, 0, 0);
+                SetForegroundWindow(hwnd);
+                return;
             }
+            ShowWindow(hwnd, SW_RESTORE);
             SetForegroundWindow(hwnd);
-        }
-    }
-
-    fn position_popup_at_cursor(hwnd: HWND) {
-        let mut cursor = POINT { x: 0, y: 0 };
-        let monitor = unsafe {
-            GetCursorPos(&mut cursor);
-            MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST)
-        };
-        let mut info = MONITORINFO {
-            cbSize: size_of::<MONITORINFO>() as u32,
-            rcMonitor: RECT {
-                left: 0,
-                top: 0,
-                right: 0,
-                bottom: 0,
-            },
-            rcWork: RECT {
-                left: 0,
-                top: 0,
-                right: 0,
-                bottom: 0,
-            },
-            dwFlags: 0,
-        };
-        if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
-            return;
-        }
-        let mut rect = RECT {
-            left: 0,
-            top: 0,
-            right: 0,
-            bottom: 0,
-        };
-        unsafe { GetWindowRect(hwnd, &mut rect) };
-        let width = (rect.right - rect.left).max(1);
-        let height = (rect.bottom - rect.top).max(1);
-        unsafe {
-            SetWindowPos(
-                hwnd,
-                HWND_TOPMOST,
-                info.rcWork.right - width - EDGE_MARGIN,
-                info.rcWork.bottom - height - EDGE_MARGIN,
-                0,
-                0,
-                SWP_NOACTIVATE | SWP_NOSIZE | SWP_SHOWWINDOW,
-            );
         }
     }
 

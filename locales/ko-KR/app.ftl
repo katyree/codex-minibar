@@ -293,8 +293,8 @@ updated = 업데이트됨{ " " }
 refresh-last-updated-relative = 새로고침 | 마지막 업데이트: { $relative }
 
 # src/popup_window/ui/footer.rs
-popup-pin = 열어 두기
-popup-unpin = 바깥쪽을 클릭하면 닫기
+popup-pin = 맨 위에 고정하고 열린 상태 유지
+popup-unpin = 고정 해제하고 포커스를 잃으면 닫기
 
 # src/popup_window/ui/home.rs
 edit-home = 홈 편집
@@ -2915,3 +2915,17 @@ label-possible-reset-before-when-within-countdown = { $label }: { $when } 이전
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } 지연
+
+# Floating usage panel
+popup-floating = 플로팅 패널
+popup-floating-description = 패널을 열어 두고 헤더를 드래그하여 위치나 모니터를 변경합니다.
+popup-always-on-top = 항상 위에 표시
+popup-always-on-top-description = 패널을 다른 앱 위에 표시하고 앱을 전환해도 열린 상태로 유지합니다.
+popup-position = 패널 위치
+popup-position-description = 세션 간에 위치가 저장됩니다.
+popup-reset-position = 위치 초기화
+popup-drag-header = 드래그하여 이동
+popup-close = 패널 닫기
+
+show-popup-action-bar = 팝업 작업 표시줄 표시
+show-popup-action-bar-description = 일반 팝업에 앱 이름과 작업 버튼을 표시합니다. 플로팅 패널에는 항상 표시됩니다.

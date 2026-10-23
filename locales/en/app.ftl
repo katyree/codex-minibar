@@ -296,8 +296,8 @@ updated = Updated{ " " }
 refresh-last-updated-relative = Refresh | Last updated { $relative }
 
 # src/popup_window/ui/footer.rs
-popup-pin = Keep open
-popup-unpin = Close when clicking outside
+popup-pin = Pin on top and keep open
+popup-unpin = Unpin and close on focus loss
 
 # src/popup_window/ui/home.rs
 edit-home = Edit Home
@@ -2936,3 +2936,17 @@ label-possible-reset-before-when-within-countdown = { $label }: possible reset b
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } late
+
+# Floating usage panel
+popup-floating = Floating panel
+popup-floating-description = Keep the panel open and drag its header to another position or monitor.
+popup-always-on-top = Always on top
+popup-always-on-top-description = Keep the panel above other applications and open when switching apps.
+popup-position = Panel position
+popup-position-description = The position is remembered between sessions.
+popup-reset-position = Reset position
+popup-drag-header = Drag to move
+popup-close = Close panel
+
+show-popup-action-bar = Show popup action bar
+show-popup-action-bar-description = Show the app title and action buttons in the regular popup. Floating panels always show this bar.

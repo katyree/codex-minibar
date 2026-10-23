@@ -33,7 +33,7 @@ pub const WINDOW_CORNER_RADIUS_DIP: i32 = PopupCornerRadius::Small.dip();
 /// Gap between the capsule and the monitor/taskbar edges, in physical pixels.
 pub const EDGE_MARGIN_PX: i32 = 20;
 /// Popup height as a share of the monitor it is opened on.
-pub const POPUP_SCREEN_HEIGHT_FRACTION: f64 = 0.80;
+pub const POPUP_SCREEN_HEIGHT_FRACTION: f64 = 1.0;
 /// Ignore outside presses briefly after open so the tray click that showed us
 /// cannot immediately dismiss.
 const SHOW_GRACE_MS: i64 = 200;
@@ -43,9 +43,10 @@ static POPUP_CLOSING: AtomicBool = AtomicBool::new(false);
 static BUTTON_WAS_DOWN: AtomicBool = AtomicBool::new(false);
 static ESCAPE_WAS_DOWN: AtomicBool = AtomicBool::new(false);
 static IGNORE_OUTSIDE_UNTIL_MS: AtomicI64 = AtomicI64::new(0);
-/// While either is set, outside clicks and Escape do not dismiss the popup.
+/// Independent owners of popup dismissal suppression.
 static REVEAL_PINNED: AtomicBool = AtomicBool::new(false);
 static USER_PINNED: AtomicBool = AtomicBool::new(false);
+static DRAGGING: AtomicBool = AtomicBool::new(false);
 static BOTTOM_BAR_SIZE: AtomicU8 = AtomicU8::new(BottomBarSize::Comfortable.index() as u8);
 static CORNER_RADIUS_DIP: AtomicI32 = AtomicI32::new(WINDOW_CORNER_RADIUS_DIP);
 static POPUP_BACKGROUND_MATERIAL: AtomicU8 =
@@ -84,7 +85,9 @@ pub(crate) fn set_lifecycle(visible: bool, closing: bool) {
 /// Keep the popup open while it shows something the user must not lose,
 /// such as a newly created key that can never be shown again.
 pub(crate) fn set_reveal_pinned(pinned: bool) {
-    REVEAL_PINNED.store(pinned, Ordering::SeqCst);
+    if REVEAL_PINNED.swap(pinned, Ordering::SeqCst) != pinned {
+        crate::popup_window::send_command(crate::popup_window::PopupCommand::SyncPin);
+    }
 }
 
 pub(crate) fn is_reveal_pinned() -> bool {
@@ -103,7 +106,11 @@ pub(crate) fn is_user_pinned() -> bool {
 
 /// Outside clicks and Escape leave the popup open.
 pub(crate) fn is_pinned() -> bool {
-    is_reveal_pinned() || is_user_pinned()
+    is_reveal_pinned() || is_user_pinned() || DRAGGING.load(Ordering::SeqCst)
+}
+
+pub(crate) fn set_dragging(dragging: bool) {
+    DRAGGING.store(dragging, Ordering::SeqCst);
 }
 
 /// GPUI thread only: the capsule is now visible, so the press that opened it

@@ -89,7 +89,18 @@ pub(crate) enum PopupCommand {
     /// Enter Home edit mode, opening Home.
     StartHomeEditing,
     AppearanceChanged,
+    /// Apply the optimistic pin change to native stacking outside GPUI borrows.
+    SyncPin,
     Reposition,
+    /// Persist a completed native move, then rebuild the host for its new DPI.
+    Moved,
+    /// Height drag updates stay in memory; persist only on release/capture loss.
+    ResizeHeight {
+        height_dip: f32,
+        finished: bool,
+        /// Floating top-edge resizing preserves the original visible bottom.
+        fixed_bottom: Option<i32>,
+    },
     /// Another window took the foreground; restore the popup to the top of
     /// the topmost band if it is visible.
     Raise,

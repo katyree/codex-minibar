@@ -29,6 +29,9 @@ fn source(name: &str) -> Option<&'static str> {
         }
         "fluent-settings" => include_str!("../../../assets/icons/fluent-settings-20-filled.svg"),
         "fluent-pin" => include_str!("../../../assets/icons/fluent-pin-20-regular.svg"),
+        "fluent-layout-column-two" => {
+            include_str!("../../../assets/icons/fluent-layout-column-two-20-regular.svg")
+        }
         "fluent-pin-filled" => include_str!("../../../assets/icons/fluent-pin-20-filled.svg"),
         "fluent-power" => include_str!("../../../assets/icons/fluent-power-20-filled.svg"),
         "fluent-edit" => include_str!("../../../assets/icons/fluent-edit-20-filled.svg"),
@@ -278,6 +281,7 @@ mod tests {
             "fluent-arrow-download",
             "fluent-settings",
             "fluent-pin",
+            "fluent-layout-column-two",
             "fluent-pin-filled",
             "fluent-edit",
             "fluent-checkmark",

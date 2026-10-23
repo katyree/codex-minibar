@@ -395,11 +395,11 @@ refresh-last-updated-relative = { "" }
 
 # English source:
 # popup-pin = Keep open
-popup-pin = { "" }
+popup-pin = Pin on top and keep open
 
 # English source:
 # popup-unpin = Close when clicking outside
-popup-unpin = { "" }
+popup-unpin = Unpin and close on focus loss
 
 # English source:
 # edit-home = Edit Home
@@ -4322,3 +4322,17 @@ label-possible-reset-before-when-within-countdown = { "" }
 # English source:
 # time-late = { $time } late
 time-late = { "" }
+
+# Floating usage panel
+popup-floating = Floating panel
+popup-floating-description = Keep the panel open and drag its header to another position or monitor.
+popup-always-on-top = Always on top
+popup-always-on-top-description = Keep the panel above other applications and open when switching apps.
+popup-position = Panel position
+popup-position-description = The position is remembered between sessions.
+popup-reset-position = Reset position
+popup-drag-header = Drag to move
+popup-close = Close panel
+
+show-popup-action-bar = Show popup action bar
+show-popup-action-bar-description = Show the app title and action buttons in the regular popup. Floating panels always show this bar.

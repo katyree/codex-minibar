@@ -198,8 +198,8 @@ updated = Actualizado{ " " }
 refresh-last-updated-relative = Actualizar · Última actualización { $relative }
 
 # src/popup_window/ui/footer.rs
-popup-pin = Mantener abierto
-popup-unpin = Cerrar al hacer clic fuera
+popup-pin = Fijar encima y mantener abierto
+popup-unpin = Desfijar y cerrar al perder el foco
 
 edit-home = Editar inicio
 home-card-layout = Diseño
@@ -2035,3 +2035,17 @@ label-possible-reset-before-when-within-countdown = { $label }: posible restable
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } de retraso
+
+# Floating usage panel
+popup-floating = Panel flotante
+popup-floating-description = Mantén el panel abierto y arrastra su cabecera a otra posición o monitor.
+popup-always-on-top = Siempre visible
+popup-always-on-top-description = Mantener el panel encima de otras aplicaciones y abierto al cambiar de aplicación.
+popup-position = Posición del panel
+popup-position-description = La posición se recuerda entre sesiones.
+popup-reset-position = Restablecer posición
+popup-drag-header = Arrastra para mover
+popup-close = Cerrar panel
+
+show-popup-action-bar = Mostrar barra de acciones del panel emergente
+show-popup-action-bar-description = Mostrar el título y las acciones en el panel emergente normal. Los paneles flotantes siempre muestran esta barra.

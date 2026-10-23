@@ -198,10 +198,12 @@ fn send_refresh_intervals(
     ));
 }
 
-/// A visible popup or open Settings window needs frame-rate polling (outside
-/// click / Escape dismissal, live preview, settings pushes).
+/// Transient popups need frame-rate dismissal polling; pinned panels use the
+/// idle cadence. GPUI drives their animations without polling this bridge.
 fn bridge_surface_active() -> bool {
-    popup::is_visible() || popup::is_closing() || crate::settings_window::is_open()
+    (popup::is_visible() && !popup::is_pinned())
+        || popup::is_closing()
+        || crate::settings_window::is_open()
 }
 
 /// Idle tick is short enough for the 250 ms system-theme check, stream deck

@@ -179,16 +179,43 @@ pub(crate) fn host_rect(monitor: Monitor, placement: Placement) -> win32::Rect {
     };
     let (top, bottom) = if placement.top {
         let top = work.top + margin;
-        (top, (top + height).min(work.bottom))
+        (top, top + height)
     } else {
         let bottom = work.bottom - margin;
-        ((bottom - height).max(work.top), bottom)
+        (bottom - height, bottom)
     };
     win32::Rect {
         left,
         top,
         right,
         bottom,
+    }
+}
+
+/// Keep the visible origin exactly where the user placed it, even off-screen.
+/// Width and height limits must never snap a floating window back into an appbar.
+#[cfg(windows)]
+pub(crate) fn floating_host_rect(
+    monitor: Monitor,
+    x: i32,
+    y: i32,
+    two_columns: bool,
+) -> win32::Rect {
+    let margin = crate::popup::EDGE_MARGIN_PX;
+    let width_dip = if two_columns {
+        crate::popup::POPUP_WIDE_WIDTH
+    } else {
+        crate::popup::POPUP_WIDTH
+    };
+    let width = (f64::from(width_dip) * monitor.scale()).round() as i32 + margin;
+    let height = (f64::from(monitor.bounds.height()) * crate::popup::POPUP_SCREEN_HEIGHT_FRACTION)
+        .round() as i32;
+    let left = x.saturating_sub(margin);
+    win32::Rect {
+        left,
+        top: y,
+        right: left.saturating_add(width),
+        bottom: y.saturating_add(height),
     }
 }
 
@@ -285,7 +312,36 @@ fn handle_command(
 ) {
     match command {
         PopupCommand::Publish(ui) => {
+            #[cfg(windows)]
+            let geometry_changed = window
+                .update(cx, |root, _, _| {
+                    root.ui.popup_floating != ui.popup_floating
+                        || root.ui.popup_position != ui.popup_position
+                        || (ui.popup_floating && root.ui.popup_two_columns != ui.popup_two_columns)
+                })
+                .unwrap_or(false);
             let _ = window.update(cx, |root, window, cx| root.apply_ui(*ui, window, cx));
+            #[cfg(windows)]
+            {
+                if let Ok(Some((hwnd, topmost))) = window.update(cx, |root, _, _| {
+                    root.host.hwnd.map(|hwnd| {
+                        (
+                            hwnd,
+                            root.ui.popup_pinned || crate::popup::is_reveal_pinned(),
+                        )
+                    })
+                }) {
+                    win32::set_topmost(hwnd, topmost);
+                }
+                if geometry_changed {
+                    let animated = window
+                        .update(cx, |root, _, cx| root.animate_reposition(cx))
+                        .unwrap_or(false);
+                    if !animated {
+                        handle_command(PopupCommand::Reposition, window, cx);
+                    }
+                }
+            }
         }
         PopupCommand::Show { anchor, beside } => {
             #[cfg(windows)]
@@ -300,6 +356,12 @@ fn handle_command(
                     crate::popup::set_lifecycle(false, false);
                     return;
                 };
+                let topmost = window
+                    .update(cx, |root, _, _| {
+                        root.ui.popup_pinned || crate::popup::is_reveal_pinned()
+                    })
+                    .unwrap_or(true);
+                win32::set_topmost(plan.hwnd, topmost);
                 if plan.first_show {
                     // Hide every pixel before the first on-screen frame; the
                     // capsule then slides in from beyond the monitor edge.
@@ -347,6 +409,19 @@ fn handle_command(
         PopupCommand::AppearanceChanged => {
             let _ = window.update(cx, |root, window, cx| root.appearance_changed(window, cx));
         }
+        PopupCommand::SyncPin => {
+            #[cfg(windows)]
+            if let Ok(Some((hwnd, topmost))) = window.update(cx, |root, _, _| {
+                root.host.hwnd.map(|hwnd| {
+                    (
+                        hwnd,
+                        root.ui.popup_pinned || crate::popup::is_reveal_pinned(),
+                    )
+                })
+            }) {
+                win32::set_topmost(hwnd, topmost);
+            }
+        }
         PopupCommand::Settings(_) => {}
         PopupCommand::Toast(notification) => toast::post(*notification, window, cx),
         PopupCommand::Raise => {
@@ -367,16 +442,16 @@ fn handle_command(
             #[cfg(windows)]
             {
                 let plan = window
-                    .update(cx, |root, _, _| {
+                    .update(cx, |root, _, cx| {
                         let hwnd = root.host.hwnd?;
                         if !root.host.visible() {
                             return None;
                         }
-                        let rect = win32::window_rect(hwnd);
-                        let monitor = win32::monitor_for_point(rect.right - 1, rect.bottom - 1);
-                        root.host.monitor = Some(monitor);
-                        root.host.scale = monitor.scale() as f32;
-                        Some((hwnd, host_rect(monitor, root.host.placement)))
+                        let rect = root.prepare_geometry(None, false);
+                        root.remember_floating_origin(rect, cx);
+                        root.host.last_region = None;
+                        cx.notify();
+                        Some((hwnd, rect))
                     })
                     .ok()
                     .flatten();
@@ -391,6 +466,57 @@ fn handle_command(
                     });
                 }
             }
+        }
+        PopupCommand::Moved => {
+            #[cfg(windows)]
+            {
+                let _ = window.update(cx, |root, _, cx| root.save_floating_position(cx));
+                handle_command(PopupCommand::Reposition, window, cx);
+            }
+        }
+        PopupCommand::ResizeHeight {
+            height_dip,
+            finished,
+            fixed_bottom,
+        } => {
+            let _ = window.update(cx, |root, _, cx| {
+                root.resize_height(height_dip, finished, cx)
+            });
+            #[cfg(windows)]
+            if let Some(bottom) = fixed_bottom {
+                let plan = window
+                    .update(cx, |root, window, _| {
+                        if !root.ui.popup_floating || root.host.phase != root::Phase::Open {
+                            return None;
+                        }
+                        let hwnd = root.host.hwnd?;
+                        let old = win32::window_rect(hwnd);
+                        let top = bottom
+                            - (root.host.height.position * f64::from(window.scale_factor())).round()
+                                as i32;
+                        let rect = win32::Rect {
+                            left: old.left,
+                            right: old.right,
+                            top,
+                            bottom: top + old.height(),
+                        };
+                        root.host.floating_rect = Some(rect);
+                        root.host.last_region = None;
+                        Some((hwnd, rect))
+                    })
+                    .ok()
+                    .flatten();
+                if let Some((hwnd, rect)) = plan {
+                    if win32::window_rect(hwnd) != rect {
+                        win32::place_keep_order(hwnd, rect);
+                    }
+                    if finished {
+                        let _ = window.update(cx, |root, _, cx| root.save_floating_position(cx));
+                    }
+                }
+            }
+            #[cfg(not(windows))]
+            let _ = fixed_bottom;
         }
     }
 }
@@ -465,6 +591,65 @@ mod tests {
             top,
             right,
             bottom,
+        }
+    }
+
+    #[test]
+    fn floating_panel_never_adjusts_user_origin_for_edges_or_column_count() {
+        for dpi in [96, 144, 192] {
+            let monitor = Monitor {
+                dpi,
+                ..monitor(rect(40, 0, 1920, 1032))
+            };
+            for (x, y) in [(-8000, -3000), (8000, 3000), (1900, 1000), (700, 300)] {
+                for two_columns in [false, true] {
+                    let host = super::floating_host_rect(monitor, x, y, two_columns);
+                    assert_eq!(host.left + crate::popup::EDGE_MARGIN_PX, x);
+                    assert_eq!(host.top, y);
+                    let width = if two_columns {
+                        crate::popup::POPUP_WIDE_WIDTH
+                    } else {
+                        crate::popup::POPUP_WIDTH
+                    };
+                    assert_eq!(
+                        host.width(),
+                        (f64::from(width) * monitor.scale()).round() as i32
+                            + crate::popup::EDGE_MARGIN_PX
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn floating_panel_height_does_not_change_near_work_area_bottom() {
+        let monitor = monitor(rect(0, 0, 1920, 1032));
+        let top = super::floating_host_rect(monitor, 800, 100, true);
+        let bottom = super::floating_host_rect(monitor, 800, 1000, true);
+        assert_eq!(top.height(), bottom.height());
+        assert_eq!(bottom.top, 1000);
+    }
+
+    #[test]
+    fn tray_popup_reserves_full_screen_height_on_both_taskbar_edges() {
+        for top in [false, true] {
+            let monitor = monitor(if top {
+                rect(0, 48, 1920, 1080)
+            } else {
+                rect(0, 0, 1920, 1032)
+            });
+            let host = super::host_rect(monitor, Placement { left: false, top });
+            assert_eq!(host.height(), monitor.bounds.height());
+            if top {
+                assert_eq!(host.top, monitor.work.top + crate::popup::EDGE_MARGIN_PX);
+            } else {
+                assert_eq!(
+                    host.bottom,
+                    monitor.work.bottom - crate::popup::EDGE_MARGIN_PX
+                );
+            }
+            let floating = super::floating_host_rect(monitor, 400, 200, false);
+            assert_eq!(floating.height(), monitor.bounds.height());
         }
     }
 

@@ -297,8 +297,8 @@ updated = Mise à jour{ " " }
 refresh-last-updated-relative = Actualiser · Dernière mise à jour : { $relative }
 
 # src/popup_window/ui/footer.rs
-popup-pin = Garder ouvert
-popup-unpin = Fermer en cliquant à l'extérieur
+popup-pin = Épingler au premier plan et garder ouvert
+popup-unpin = Désépingler et fermer à la perte de focus
 
 # src/popup_window/ui/home.rs
 edit-home = Modifier l'accueil
@@ -2944,3 +2944,17 @@ label-possible-reset-before-when-within-countdown = { $label } : réinitialisati
 
 # src/popup_window/ui/cards.rs
 time-late = { $time } de retard
+
+# Floating usage panel
+popup-floating = Panneau flottant
+popup-floating-description = Gardez le panneau ouvert et faites glisser son en-tête vers une autre position ou un autre écran.
+popup-always-on-top = Toujours au premier plan
+popup-always-on-top-description = Garder le panneau au-dessus des autres applications et ouvert lors du changement d’application.
+popup-position = Position du panneau
+popup-position-description = La position est conservée entre les sessions.
+popup-reset-position = Réinitialiser la position
+popup-drag-header = Faire glisser pour déplacer
+popup-close = Fermer le panneau
+
+show-popup-action-bar = Afficher la barre d’actions du panneau
+show-popup-action-bar-description = Afficher le titre et les actions dans le panneau normal. Les panneaux flottants affichent toujours cette barre.
