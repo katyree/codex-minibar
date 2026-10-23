@@ -292,6 +292,10 @@ updated = 更新済み{ " " }
 # src/popup_window/ui/footer.rs
 refresh-last-updated-relative = 更新 · 最終更新: { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = 開いたままにする
+popup-unpin = 外側をクリックしたら閉じる
+
 # src/popup_window/ui/home.rs
 edit-home = ホームを編集
 home-card-layout = レイアウト

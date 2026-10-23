@@ -1415,6 +1415,18 @@ impl PopupRoot {
         }
     }
 
+    pub(super) fn toggle_user_pin(&mut self, cx: &mut Context<Self>) {
+        let pinned = !self.ui.popup_pinned;
+        // Dismissal reads the flag on the bridge thread; do not wait for the
+        // settings writer to round-trip.
+        crate::popup::set_user_pinned(pinned);
+        self.persist(
+            cx,
+            move |ui| ui.popup_pinned = pinned,
+            move |settings| settings.popup_pinned = pinned,
+        );
+    }
+
     pub(super) fn open_settings(&mut self) {
         crate::settings_window::open();
     }

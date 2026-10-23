@@ -28,6 +28,8 @@ fn source(name: &str) -> Option<&'static str> {
             include_str!("../../../assets/icons/fluent-arrow-download-24-filled.svg")
         }
         "fluent-settings" => include_str!("../../../assets/icons/fluent-settings-20-filled.svg"),
+        "fluent-pin" => include_str!("../../../assets/icons/fluent-pin-20-regular.svg"),
+        "fluent-pin-filled" => include_str!("../../../assets/icons/fluent-pin-20-filled.svg"),
         "fluent-power" => include_str!("../../../assets/icons/fluent-power-20-filled.svg"),
         "fluent-edit" => include_str!("../../../assets/icons/fluent-edit-20-filled.svg"),
         "fluent-checkmark" => {
@@ -275,6 +277,8 @@ mod tests {
             "fluent-refresh",
             "fluent-arrow-download",
             "fluent-settings",
+            "fluent-pin",
+            "fluent-pin-filled",
             "fluent-edit",
             "fluent-checkmark",
             "fluent-delete",

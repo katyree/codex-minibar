@@ -336,7 +336,7 @@ impl KeyAdmin {
         self.editor = None;
         self.confirm_delete = None;
         self.untrack = None;
-        crate::popup::set_pinned(false);
+        crate::popup::set_reveal_pinned(false);
     }
 }
 
@@ -1088,7 +1088,7 @@ impl PopupRoot {
     fn close_key_page(&mut self, cx: &mut Context<Self>) {
         // Dropping the reveal wipes the secret.
         self.keys.page = None;
-        crate::popup::set_pinned(false);
+        crate::popup::set_reveal_pinned(false);
         cx.notify();
     }
 
@@ -1174,7 +1174,7 @@ impl PopupRoot {
                             copied: false,
                             tracking,
                         }));
-                        crate::popup::set_pinned(true);
+                        crate::popup::set_reveal_pinned(true);
                     }
                     Err(error) => {
                         if let Some(KeyPage::Create(form)) = this.keys.page.as_mut()
@@ -1253,8 +1253,8 @@ impl PopupRoot {
     /// Keeps the outside-click pin in step with the reveal page.
     pub(super) fn sync_key_pin(&self) {
         let revealing = matches!(self.keys.page, Some(KeyPage::Reveal(_)));
-        if crate::popup::is_pinned() != revealing {
-            crate::popup::set_pinned(revealing);
+        if crate::popup::is_reveal_pinned() != revealing {
+            crate::popup::set_reveal_pinned(revealing);
         }
     }
 

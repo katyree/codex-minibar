@@ -194,6 +194,10 @@ updated = 已更新{ " " }
 
 refresh-last-updated-relative = 重新整理 · 上次更新於 { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = 保持開啟
+popup-unpin = 點擊外部時關閉
+
 edit-home = 編輯首頁
 home-card-layout = 版面配置
 home-card-layout-cards = 卡片

@@ -394,6 +394,14 @@ updated = { "" }
 refresh-last-updated-relative = { "" }
 
 # English source:
+# popup-pin = Keep open
+popup-pin = { "" }
+
+# English source:
+# popup-unpin = Close when clicking outside
+popup-unpin = { "" }
+
+# English source:
 # edit-home = Edit Home
 edit-home = { "" }
 

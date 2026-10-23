@@ -2179,6 +2179,8 @@ pub struct Settings {
     pub show_account_name: bool,
     /// Shows the Edit Home button in the popup's bottom bar.
     pub show_edit_home_button: bool,
+    /// Footer pin: outside clicks and Escape leave the popup open.
+    pub popup_pinned: bool,
     /// System-wide shortcut that shows or hides the popup. None leaves every
     /// key combination to other applications.
     pub popup_hotkey: Option<crate::hotkey::Hotkey>,
@@ -2257,6 +2259,7 @@ impl Default for Settings {
             total_spend_period: TotalSpendPeriod::default(),
             show_account_name: false,
             show_edit_home_button: true,
+            popup_pinned: false,
             popup_hotkey: None,
             // An empty list intentionally means "show the ordinary app icon".
             tray_widgets: Vec::new(),
@@ -2954,6 +2957,7 @@ impl Settings {
             &self.game_mode_games,
             &self.game_mode_ignored,
         );
+        crate::popup::set_user_pinned(self.popup_pinned);
         crate::popup::apply_popup_appearance(
             self.bottom_bar_size,
             self.popup_corner_radius,

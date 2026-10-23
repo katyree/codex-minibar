@@ -290,6 +290,10 @@ updated = Обновлено{ " " }
 # src/popup_window/ui/footer.rs
 refresh-last-updated-relative = Обновить | Последнее обновление: { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = Не закрывать
+popup-unpin = Закрывать по клику снаружи
+
 # src/popup_window/ui/home.rs
 edit-home = Изменить главную
 home-card-layout = Вид

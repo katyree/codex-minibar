@@ -292,6 +292,10 @@ updated = 업데이트됨{ " " }
 # src/popup_window/ui/footer.rs
 refresh-last-updated-relative = 새로고침 | 마지막 업데이트: { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = 열어 두기
+popup-unpin = 바깥쪽을 클릭하면 닫기
+
 # src/popup_window/ui/home.rs
 edit-home = 홈 편집
 home-card-layout = 레이아웃
