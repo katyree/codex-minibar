@@ -1,1 +1,12 @@
-{"schema_version": 2, "resets": []}
+{
+  "schema_version": 2,
+  "resets": [
+    {
+      "id": "forced-2026-10-23T17:00:00Z",
+      "type": "forced",
+      "source_url": "https://x.com/thsottiaux/status/2113492502355562875",
+      "label": "Day 18 reset (lands before 10am PT)",
+      "reset_at": "2026-10-23T17:00:00Z"
+    }
+  ]
+}
