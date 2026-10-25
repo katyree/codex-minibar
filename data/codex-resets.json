@@ -1,12 +1,4 @@
 {
   "schema_version": 2,
-  "resets": [
-    {
-      "id": "forced-2026-10-25T07:00:00Z",
-      "type": "forced",
-      "reset_at": "2026-10-25T07:00:00Z",
-      "source_url": "https://x.com/thsottiaux/status/2114200291319124163",
-      "label": "Day 20 rest and reset, by midnight Pacific"
-    }
-  ]
+  "resets": []
 }
