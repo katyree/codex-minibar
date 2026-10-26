@@ -39,7 +39,7 @@ type PendingPress = {
 };
 
 const REFRESH_HOLD_MS = 700;
-const SNAPSHOT_POLL_MS = 30_000;
+const SNAPSHOT_POLL_MS = 1_000;
 const SNAPSHOT_CACHE_MS = 60_000;
 
 const bridge = new MinibarBridge();
@@ -145,7 +145,7 @@ async function refresh(): Promise<void> {
 
 function ensureRefreshLoop(): void {
   if (refreshTimer) return;
-  // Repaint countdowns locally each second; only poll the bridge every 30 seconds.
+  // Poll the bridge and repaint countdowns each second.
   refreshTimer = setInterval(() => void refresh(), 1000);
 }
 
