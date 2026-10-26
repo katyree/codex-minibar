@@ -24,6 +24,7 @@ const ZH_TW: &str = include_str!("../locales/zh-TW/app.ftl");
 const JA: &str = include_str!("../locales/ja/app.ftl");
 const DE: &str = include_str!("../locales/de/app.ftl");
 const FR: &str = include_str!("../locales/fr/app.ftl");
+const TR: &str = include_str!("../locales/tr/app.ftl");
 const KO_KR: &str = include_str!("../locales/ko-KR/app.ftl");
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,20 +42,23 @@ pub enum Language {
     French,
     TraditionalChinese,
     Korean,
+    Turkish,
 }
 
-static CURRENT: AtomicU8 = AtomicU8::new(1);
+static CURRENT: AtomicU8 = AtomicU8::new(Language::English.index() as u8);
 
 impl Language {
-    pub const SUPPORTED: [Self; 10] = [
-        Self::English,
-        Self::Russian,
-        Self::BrazilianPortuguese,
-        Self::Spanish,
-        Self::SimplifiedChinese,
-        Self::Japanese,
+    // Native names in alphabetical (Unicode) order, shared by every selector.
+    pub const SUPPORTED: [Self; 11] = [
         Self::German,
+        Self::English,
+        Self::Spanish,
         Self::French,
+        Self::BrazilianPortuguese,
+        Self::Turkish,
+        Self::Russian,
+        Self::Japanese,
+        Self::SimplifiedChinese,
         Self::TraditionalChinese,
         Self::Korean,
     ];
@@ -69,19 +73,20 @@ impl Language {
             self
         }
     }
-    pub fn index(self) -> usize {
+    pub const fn index(self) -> usize {
         match self {
             Self::Auto => 0,
-            Self::English => 1,
-            Self::Russian => 2,
-            Self::BrazilianPortuguese => 3,
-            Self::Spanish => 4,
-            Self::SimplifiedChinese => 5,
-            Self::Japanese => 6,
-            Self::German => 7,
-            Self::French => 8,
-            Self::TraditionalChinese => 9,
-            Self::Korean => 10,
+            Self::German => 1,
+            Self::English => 2,
+            Self::Spanish => 3,
+            Self::French => 4,
+            Self::BrazilianPortuguese => 5,
+            Self::Turkish => 6,
+            Self::Russian => 7,
+            Self::Japanese => 8,
+            Self::SimplifiedChinese => 9,
+            Self::TraditionalChinese => 10,
+            Self::Korean => 11,
         }
     }
     pub fn from_index(index: usize) -> Self {
@@ -90,17 +95,18 @@ impl Language {
             .copied()
             .unwrap_or(Self::Auto)
     }
-    pub fn labels() -> [&'static str; 11] {
+    pub fn labels() -> [&'static str; 12] {
         [
             tr("auto-windows"),
-            "English",
-            "Русский",
-            "Português (Brasil)",
-            "Español",
-            "简体中文",
-            "日本語",
             "Deutsch",
+            "English",
+            "Español",
             "Français",
+            "Português (Brasil)",
+            "Türkçe",
+            "Русский",
+            "日本語",
+            "简体中文",
             "繁體中文",
             "한국어",
         ]
@@ -145,6 +151,7 @@ fn language_from_tag(tag: &str) -> Language {
         "de" => Language::German,
         "fr" => Language::French,
         "ko" => Language::Korean,
+        "tr" => Language::Turkish,
         _ => Language::English,
     }
 }
@@ -163,6 +170,7 @@ fn language_from_windows_langid(langid: u16) -> Language {
         0x07 => "de",
         0x0c => "fr",
         0x12 => "ko",
+        0x1f => "tr",
         _ => "en",
     })
 }
@@ -247,6 +255,7 @@ struct Catalogs {
     de: FluentBundle<FluentResource>,
     fr: FluentBundle<FluentResource>,
     ko_kr: FluentBundle<FluentResource>,
+    tr: FluentBundle<FluentResource>,
 }
 impl Catalogs {
     fn new() -> Self {
@@ -261,6 +270,7 @@ impl Catalogs {
             de: bundle("de", DE),
             fr: bundle("fr", FR),
             ko_kr: bundle("ko-KR", KO_KR),
+            tr: bundle("tr", TR),
         }
     }
     fn for_language(&self, language: Language) -> &FluentBundle<FluentResource> {
@@ -274,6 +284,7 @@ impl Catalogs {
             Language::German => &self.de,
             Language::French => &self.fr,
             Language::Korean => &self.ko_kr,
+            Language::Turkish => &self.tr,
             _ => &self.en,
         }
     }
@@ -325,7 +336,10 @@ pub fn tr(key: &'static str) -> &'static str {
 /// Keep stored errors in the source language so login detection and future
 /// language switches are independent of the language at the time of a poll.
 pub fn english(key: &'static str) -> &'static str {
-    LABELS.get(key).map(|labels| labels[0]).unwrap_or(key)
+    LABELS
+        .get(key)
+        .map(|labels| labels[Language::English.index() - 1])
+        .unwrap_or(key)
 }
 
 /// Resolve an explicit language without changing the process language. Also
@@ -345,7 +359,7 @@ pub fn localize_error(source: &str) -> String {
         .map(|line| {
             LABELS
                 .values()
-                .find(|labels| labels[0] == line)
+                .find(|labels| labels[Language::English.index() - 1] == line)
                 .map(|labels| labels[index])
                 .unwrap_or(line)
         })
@@ -366,7 +380,9 @@ fn month_day_in(language: Language, date: impl chrono::Datelike) -> String {
         ][(date.month() - 1) as usize],
     );
     match language {
-        Language::Russian | Language::French => format!("{} {month}", date.day()),
+        Language::Russian | Language::French | Language::Turkish => {
+            format!("{} {month}", date.day())
+        }
         Language::German => format!("{}. {month}", date.day()),
         Language::BrazilianPortuguese | Language::Spanish => format!("{} de {month}", date.day()),
         Language::Korean => format!("{month} {}일", date.day()),
@@ -391,7 +407,7 @@ fn date_with_year_in(language: Language, date: impl chrono::Datelike + Copy) -> 
         Language::SimplifiedChinese | Language::TraditionalChinese | Language::Japanese => {
             format!("{}年{}", date.year(), month_day_in(language, date))
         }
-        Language::German | Language::French => {
+        Language::German | Language::French | Language::Turkish => {
             format!("{} {}", month_day_in(language, date), date.year())
         }
         Language::BrazilianPortuguese | Language::Spanish => {
@@ -433,6 +449,62 @@ mod tests {
     use super::*;
     use fluent_syntax::ast::{Entry, Expression, InlineExpression, Pattern, PatternElement};
     use std::collections::{BTreeMap, BTreeSet};
+
+    #[test]
+    fn native_language_names_are_sorted_and_match_their_selection_indices() {
+        let labels = Language::labels();
+        assert!(labels[1..].windows(2).all(|pair| pair[0] < pair[1]));
+        for (offset, language) in Language::SUPPORTED.into_iter().enumerate() {
+            assert_eq!(language.index(), offset + 1);
+            assert_eq!(Language::from_index(offset + 1), language);
+        }
+        assert_eq!(labels[Language::English.index()], "English");
+        assert_eq!(labels[Language::Turkish.index()], "Türkçe");
+        assert_eq!(labels[Language::Russian.index()], "Русский");
+        // Reordering the selector must not change source-language diagnostics.
+        assert_eq!(english("settings"), "Settings");
+        assert_eq!(tr_in(Language::English, "settings"), "Settings");
+        assert_eq!(tr_in(Language::German, "settings"), "Einstellungen");
+    }
+
+    #[test]
+    fn turkish_detection_dates_counts_and_settings() {
+        for tag in ["tr", "tr-TR", "TR_tr.UTF-8", "tr-CY"] {
+            assert_eq!(language_from_tag(tag), Language::Turkish);
+        }
+        for langid in [0x041f, 0x001f] {
+            assert_eq!(language_from_windows_langid(langid), Language::Turkish);
+        }
+        let date = chrono::NaiveDate::from_ymd_opt(2026, 10, 8).unwrap();
+        assert_eq!(month_day_in(Language::Turkish, date), "8 Eki");
+        assert_eq!(date_with_year_in(Language::Turkish, date), "8 Eki 2026");
+        assert_eq!(tr_in(Language::Turkish, "settings"), "Ayarlar");
+        assert_eq!(
+            tr_in(Language::Turkish, "codex-minibar-settings"),
+            "Codex Minibar Ayarları"
+        );
+        for number in [0, 1, 2, 5, 21, 1_000_000] {
+            assert_eq!(
+                format_in(Language::Turkish, "requests", &[("v0", number.to_string())]),
+                format!("{number} istek")
+            );
+        }
+        assert_eq!(
+            format_in(
+                Language::Turkish,
+                "name-deleted",
+                &[("name", "İş hesabı 🦀".into())]
+            ),
+            "İş hesabı 🦀 silindi."
+        );
+        let settings: crate::settings::Settings = toml::from_str("language = 'turkish'").unwrap();
+        assert_eq!(settings.language, Language::Turkish);
+        assert!(
+            toml::to_string(&settings)
+                .unwrap()
+                .contains("language = \"turkish\"")
+        );
+    }
 
     fn inline_variables(expression: &InlineExpression<&str>, result: &mut BTreeSet<String>) {
         match expression {
@@ -508,6 +580,7 @@ mod tests {
             (Language::German, DE),
             (Language::French, FR),
             (Language::Korean, KO_KR),
+            (Language::Turkish, TR),
         ] {
             assert_eq!(
                 en,
@@ -650,10 +723,14 @@ mod tests {
             de: bundle("de", "empty = { \"\" }\nbad = Hello { $unknown }\n"),
             fr: bundle("fr", "empty = { \"\" }\nbad = Hello { $unknown }\n"),
             ko_kr: bundle("ko-KR", "empty = { \"\" }\nbad = Hello { $unknown }\n"),
+            tr: bundle("tr", "empty = { \"\" }\nbad = Hello { $unknown }\n"),
         };
         let mut args = FluentArgs::new();
         args.set("name", "Ada");
-        for language in Language::SUPPORTED.into_iter().skip(1) {
+        for language in Language::SUPPORTED
+            .into_iter()
+            .filter(|language| *language != Language::English)
+        {
             assert_eq!(
                 catalogs.resolve(language, "missing", None).as_deref(),
                 Some("English")

@@ -420,6 +420,7 @@ fn locale_tag(language: Language) -> &'static str {
         Language::German => "de",
         Language::French => "fr",
         Language::Korean => "ko-KR",
+        Language::Turkish => "tr",
         Language::English | Language::Auto => "en",
     }
 }
@@ -748,6 +749,11 @@ mod tests {
     #[test]
     fn korean_summary_uses_its_catalog_tag() {
         assert_eq!(locale_tag(Language::Korean), "ko-KR");
+    }
+
+    #[test]
+    fn turkish_summary_uses_its_catalog_tag() {
+        assert_eq!(locale_tag(Language::Turkish), "tr");
     }
 
     fn inline(text: &str) -> Inline {
