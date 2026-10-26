@@ -91,13 +91,6 @@ pub(crate) fn animations_enabled(ui: &UiState) -> bool {
     ui.animations_enabled && crate::popup::system_animations_enabled()
 }
 
-/// Whether the popup HWND sits in the topmost band. The tray-anchored popup
-/// always does, so a foreign window activating over it cannot cover its hide
-/// animation; the floating panel is topmost only while pinned.
-fn wants_topmost(ui: &UiState) -> bool {
-    !ui.popup_floating || ui.popup_pinned || crate::popup::is_reveal_pinned()
-}
-
 /// Which corner of the work area the popup stands in.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Placement {
@@ -330,11 +323,6 @@ fn handle_command(
             let _ = window.update(cx, |root, window, cx| root.apply_ui(*ui, window, cx));
             #[cfg(windows)]
             {
-                if let Ok(Some((hwnd, topmost))) = window.update(cx, |root, _, _| {
-                    root.host.hwnd.map(|hwnd| (hwnd, wants_topmost(&root.ui)))
-                }) {
-                    win32::set_topmost(hwnd, topmost);
-                }
                 if geometry_changed {
                     let animated = window
                         .update(cx, |root, _, cx| root.animate_reposition(cx))
@@ -358,10 +346,6 @@ fn handle_command(
                     crate::popup::set_lifecycle(false, false);
                     return;
                 };
-                let topmost = window
-                    .update(cx, |root, _, _| wants_topmost(&root.ui))
-                    .unwrap_or(true);
-                win32::set_topmost(plan.hwnd, topmost);
                 if plan.first_show {
                     // Hide every pixel before the first on-screen frame; the
                     // capsule then slides in from beyond the monitor edge.
@@ -408,14 +392,6 @@ fn handle_command(
         }
         PopupCommand::AppearanceChanged => {
             let _ = window.update(cx, |root, window, cx| root.appearance_changed(window, cx));
-        }
-        PopupCommand::SyncPin => {
-            #[cfg(windows)]
-            if let Ok(Some((hwnd, topmost))) = window.update(cx, |root, _, _| {
-                root.host.hwnd.map(|hwnd| (hwnd, wants_topmost(&root.ui)))
-            }) {
-                win32::set_topmost(hwnd, topmost);
-            }
         }
         PopupCommand::Settings(_) => {}
         PopupCommand::Toast(notification) => toast::post(*notification, window, cx),

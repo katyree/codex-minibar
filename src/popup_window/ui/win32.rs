@@ -28,29 +28,29 @@ use windows_sys::Win32::{
         Shell::{DefSubclassProc, SetWindowSubclass},
         WindowsAndMessaging::{
             EVENT_SYSTEM_FOREGROUND, FindWindowExW, GWL_EXSTYLE, GWL_STYLE, GetClassNameW,
-            GetCursorPos, GetWindowLongPtrW, GetWindowRect, HTCAPTION, HTCLIENT, HWND_NOTOPMOST,
-            HWND_TOP, HWND_TOPMOST, IDC_SIZENS, LoadCursorW, MA_NOACTIVATE, SW_HIDE,
-            SW_SHOWNOACTIVATE, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER,
-            SWP_NOSIZE, SWP_NOZORDER, SetCursor, SetForegroundWindow, SetWindowLongPtrW,
-            SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
-            WM_CAPTURECHANGED, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE,
-            WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCCALCSIZE,
-            WM_NCHITTEST, WM_NCLBUTTONDBLCLK, WM_SETCURSOR, WM_SETTINGCHANGE, WS_CAPTION,
-            WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP,
-            WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU,
-            WS_THICKFRAME,
+            GetCursorPos, GetWindowLongPtrW, GetWindowRect, HTCAPTION, HTCLIENT, HWND_TOPMOST,
+            IDC_SIZENS, LoadCursorW, MA_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, SWP_FRAMECHANGED,
+            SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SetCursor,
+            SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
+            WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_CAPTURECHANGED, WM_DISPLAYCHANGE,
+            WM_DPICHANGED, WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP,
+            WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCCALCSIZE, WM_NCHITTEST, WM_NCLBUTTONDBLCLK,
+            WM_SETCURSOR, WM_SETTINGCHANGE, WS_CAPTION, WS_EX_APPWINDOW, WS_EX_LAYERED,
+            WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+            WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
         },
     },
 };
 
 const SUBCLASS_ID: usize = 0x434D_4250; // "CMBP"
 pub(crate) const SHOW_MESSAGE: u32 = 0x8000 + 0x034D;
+/// A second launch finds the running popup by this title.
+pub(crate) const POPUP_TITLE: &str = "Codex Minibar";
 const DWMWCP_DONOTROUND: u32 = 1;
 const DWMNCRP_DISABLED: u32 = 1;
 
 thread_local! {
     static POPUP_HWND: std::cell::Cell<HWND> = const { std::cell::Cell::new(std::ptr::null_mut()) };
-    static TOPMOST: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
     static DRAG_HEADER: std::cell::Cell<Option<Rect>> = const { std::cell::Cell::new(None) };
     static MOVING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static RESIZE_AREA: std::cell::Cell<Option<ResizeArea>> = const { std::cell::Cell::new(None) };
@@ -134,36 +134,6 @@ fn finish_height_drag() {
 
 pub(crate) fn set_drag_header(rect: Option<Rect>) {
     DRAG_HEADER.set(rect);
-}
-
-/// Outside GPUI borrows: changing the z-order can send synchronous messages.
-pub(crate) fn set_topmost(hwnd: HWND, enabled: bool) {
-    if TOPMOST.replace(enabled) == enabled {
-        return;
-    }
-    unsafe {
-        SetWindowPos(
-            hwnd,
-            if enabled {
-                HWND_TOPMOST
-            } else {
-                HWND_NOTOPMOST
-            },
-            0,
-            0,
-            0,
-            0,
-            SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE,
-        );
-    }
-}
-
-fn insertion_order(hwnd: HWND) -> HWND {
-    if POPUP_HWND.get() == hwnd && !TOPMOST.get() {
-        HWND_TOP
-    } else {
-        HWND_TOPMOST
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -335,6 +305,8 @@ pub(crate) fn configure(hwnd: HWND) {
     POPUP_HWND.set(hwnd);
     unsafe {
         SetWindowSubclass(hwnd, Some(popup_subclass_proc), SUBCLASS_ID, 0);
+        let title: Vec<u16> = POPUP_TITLE.encode_utf16().chain(Some(0)).collect();
+        SetWindowTextW(hwnd, title.as_ptr());
     }
     restyle(hwnd);
     unsafe {
@@ -449,7 +421,7 @@ unsafe extern "system" fn foreground_changed(
                 return;
             }
             crate::popup::hide();
-        } else if TOPMOST.get() {
+        } else {
             crate::popup_window::send_command(crate::popup_window::PopupCommand::Raise);
         }
     }
@@ -458,9 +430,6 @@ unsafe extern "system" fn foreground_changed(
 /// Restore the visible popup to the top of the topmost band. Outside any GPUI
 /// borrow only.
 pub(crate) fn raise(hwnd: HWND) {
-    if !TOPMOST.get() {
-        return;
-    }
     unsafe {
         SetWindowPos(
             hwnd,
@@ -605,7 +574,7 @@ pub(crate) fn place(hwnd: HWND, rect: Rect) {
     unsafe {
         SetWindowPos(
             hwnd,
-            insertion_order(hwnd),
+            HWND_TOPMOST,
             rect.left,
             rect.top,
             rect.width().max(1),
@@ -622,7 +591,7 @@ pub(crate) fn show(hwnd: HWND) {
         ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         SetWindowPos(
             hwnd,
-            insertion_order(hwnd),
+            HWND_TOPMOST,
             0,
             0,
             0,

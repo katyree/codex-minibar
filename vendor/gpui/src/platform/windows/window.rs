@@ -397,7 +397,11 @@ impl WindowsWindow {
         );
 
         let (mut dwexstyle, dwstyle) = if params.kind == WindowKind::PopUp {
-            (WS_EX_TOOLWINDOW, WINDOW_STYLE(0x0))
+            // codex-minibar patch: create pop-ups in the topmost band. Later
+            // SetWindowPos(HWND_TOPMOST) calls are ignored while the process
+            // lacks foreground permission (e.g. a Stream Deck request), which
+            // left a cold-started popup opening beneath other windows.
+            (WS_EX_TOOLWINDOW | WS_EX_TOPMOST, WINDOW_STYLE(0x0))
         } else {
             let mut dwstyle = WS_SYSMENU;
 

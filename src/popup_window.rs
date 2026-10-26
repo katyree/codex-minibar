@@ -89,8 +89,6 @@ pub(crate) enum PopupCommand {
     /// Enter Home edit mode, opening Home.
     StartHomeEditing,
     AppearanceChanged,
-    /// Apply the optimistic pin change to native stacking outside GPUI borrows.
-    SyncPin,
     Reposition,
     /// Persist a completed native move, then rebuild the host for its new DPI.
     Moved,

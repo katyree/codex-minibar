@@ -504,7 +504,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
             publish_popup_ui(ui);
         };
 
-        let drain_streamdeck = || {
+        let drain_streamdeck = |ui: &UiState| {
             while let Ok(command) = streamdeck_rx.try_recv() {
                 match command {
                     crate::streamdeck::Command::RefreshData => {
@@ -526,6 +526,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
                             Some(provider) => crate::popup_window::request_provider_view(provider),
                             None => crate::popup_window::request_home_view(),
                         }
+                        flush_popup_ui(ui);
                         popup::show_on_primary();
                     }
                     crate::streamdeck::Command::OpenCommandPaletteSettings => {
@@ -539,7 +540,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
             publish_popup_ui(&ui);
             loop {
                 popup::pump_messages();
-                drain_streamdeck();
+                drain_streamdeck(&ui);
                 drain_usage_actions(
                     &mut ui,
                     &mut usage_clear_generation,
@@ -575,7 +576,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
         let mut made_progress = false;
         loop {
             popup::pump_messages();
-            drain_streamdeck();
+            drain_streamdeck(&ui);
             drain_usage_actions(
                 &mut ui,
                 &mut usage_clear_generation,

@@ -85,9 +85,7 @@ pub(crate) fn set_lifecycle(visible: bool, closing: bool) {
 /// Keep the popup open while it shows something the user must not lose,
 /// such as a newly created key that can never be shown again.
 pub(crate) fn set_reveal_pinned(pinned: bool) {
-    if REVEAL_PINNED.swap(pinned, Ordering::SeqCst) != pinned {
-        crate::popup_window::send_command(crate::popup_window::PopupCommand::SyncPin);
-    }
+    REVEAL_PINNED.store(pinned, Ordering::SeqCst);
 }
 
 pub(crate) fn is_reveal_pinned() -> bool {

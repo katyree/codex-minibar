@@ -1708,7 +1708,6 @@ impl PopupRoot {
             move |ui| ui.popup_pinned = pinned,
             move |settings| settings.popup_pinned = pinned,
         );
-        send_command(PopupCommand::SyncPin);
     }
 
     pub(super) fn toggle_two_columns(&mut self, cx: &mut Context<Self>) {
