@@ -12,7 +12,7 @@ pub(super) fn provider_worker_event_is_current(
     ui.provider_enabled(provider) && worker_revision == ui.credentials_revision(provider)
 }
 
-fn forced_reset_info_body(reset: &crate::reset_feed::ForcedReset) -> String {
+fn forced_reset_info_body(reset: &crate::reset_feed::AnnouncedReset) -> String {
     let local = reset.reset_at.with_timezone(&Local);
     let when = format!(
         "{}, {}",
@@ -20,34 +20,36 @@ fn forced_reset_info_body(reset: &crate::reset_feed::ForcedReset) -> String {
         TimeFormat::current().format_hm(local)
     );
     let countdown = format_reset_in(Some(reset.reset_at));
-    reset.label.as_deref().map_or_else(
-        || {
+    let before = reset.timing == crate::reset_feed::ResetTiming::Before;
+    let mut args = vec![("when", when), ("countdown", countdown)];
+    match reset.label.as_deref() {
+        Some(label) => {
+            args.push(("label", label.to_owned()));
             crate::i18n::format(
-                "a-possible-codex-reset-is-scheduled-for-when-in-countdown",
-                &[
-                    ("when", when.to_string()),
-                    ("countdown", countdown.to_string()),
-                ],
+                if before {
+                    "label-possible-reset-before-when-within-countdown"
+                } else {
+                    "label-possible-reset-on-when-in-countdown"
+                },
+                &args,
             )
-        },
-        |label| {
-            crate::i18n::format(
-                "label-possible-reset-on-when-in-countdown",
-                &[
-                    ("label", label.to_string()),
-                    ("when", when.to_string()),
-                    ("countdown", countdown.to_string()),
-                ],
-            )
-        },
-    )
+        }
+        None => crate::i18n::format(
+            if before {
+                "a-possible-codex-reset-is-expected-before-when-within-countdown"
+            } else {
+                "a-possible-codex-reset-is-scheduled-for-when-in-countdown"
+            },
+            &args,
+        ),
+    }
 }
 
 /// Notifies only that new feed information arrived. This is intentionally
 /// unrelated to the API-driven `limits_changed` notification: the feed never
 /// proves that a reset actually happened at `reset_at`.
 fn notify_new_forced_reset_info(
-    resets: &[crate::reset_feed::ForcedReset],
+    resets: &[crate::reset_feed::AnnouncedReset],
     notified_ids: &mut HashSet<String>,
     settings: &NotificationSettings,
     state: &AppState,
@@ -59,7 +61,12 @@ fn notify_new_forced_reset_info(
     for reset in resets.iter().filter(|reset| reset.reset_at > now) {
         if notified_ids.insert(reset.id.clone()) {
             notifications::show(
-                crate::i18n::tr("new-codex-reset-info"),
+                match reset.kind {
+                    crate::reset_feed::ResetKind::Forced => crate::i18n::tr("new-codex-reset-info"),
+                    crate::reset_feed::ResetKind::Banked => {
+                        crate::i18n::tr("new-codex-banked-reset-info")
+                    }
+                },
                 &forced_reset_info_body(reset),
             );
             state.mark_forced_reset_info_notified(reset.id.clone());
@@ -212,10 +219,12 @@ fn send_refresh_intervals(
     ));
 }
 
-/// A visible popup or open Settings window needs frame-rate polling (outside
-/// click / Escape dismissal, live preview, settings pushes).
+/// Transient popups need frame-rate dismissal polling; pinned panels use the
+/// idle cadence. GPUI drives their animations without polling this bridge.
 fn bridge_surface_active() -> bool {
-    popup::is_visible() || popup::is_closing() || crate::settings_window::is_open()
+    (popup::is_visible() && !popup::is_pinned())
+        || popup::is_closing()
+        || crate::settings_window::is_open()
 }
 
 /// Idle tick is short enough for the 250 ms system-theme check, stream deck
@@ -517,7 +526,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
             publish_popup_ui(ui);
         };
 
-        let drain_streamdeck = || {
+        let drain_streamdeck = |ui: &UiState| {
             while let Ok(command) = streamdeck_rx.try_recv() {
                 match command {
                     crate::streamdeck::Command::RefreshData => {
@@ -539,6 +548,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
                             Some(provider) => crate::popup_window::request_provider_view(provider),
                             None => crate::popup_window::request_home_view(),
                         }
+                        flush_popup_ui(ui);
                         popup::show_on_primary();
                     }
                     crate::streamdeck::Command::OpenCommandPaletteSettings => {
@@ -552,7 +562,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
             publish_popup_ui(&ui);
             loop {
                 popup::pump_messages();
-                drain_streamdeck();
+                drain_streamdeck(&ui);
                 drain_usage_actions(
                     &mut ui,
                     &mut usage_clear_generation,
@@ -588,7 +598,7 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
         let mut made_progress = false;
         loop {
             popup::pump_messages();
-            drain_streamdeck();
+            drain_streamdeck(&ui);
             drain_usage_actions(
                 &mut ui,
                 &mut usage_clear_generation,
@@ -716,6 +726,10 @@ pub(super) fn start_background_bridge(state: Arc<AppState>) {
                     // Publish once, then let both native tray and GPUI render
                     // from that exact snapshot.
                     warn_login_expiry(provider, &limits);
+                    if provider.kind() == ProviderKind::Codex {
+                        let previous = state.current_limits().get(provider).clone();
+                        state.observe_reset_limits(provider, Some(&previous), &limits);
+                    }
                     state.replace_limits(provider, limits);
                     ui.clear_provider_error(provider);
                     let limits = state.current_limits();

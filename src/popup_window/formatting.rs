@@ -57,9 +57,13 @@ pub(crate) fn format_usd(value: f64) -> String {
     let Some((dollars, cents)) = amount.split_once('.') else {
         return format!("${amount}");
     };
-    let (sign, digits) = dollars
+    format!("${}.{cents}", group_integer_digits(dollars))
+}
+
+fn group_integer_digits(integer: &str) -> String {
+    let (sign, digits) = integer
         .strip_prefix('-')
-        .map_or(("", dollars), |digits| ("-", digits));
+        .map_or(("", integer), |digits| ("-", digits));
     let mut grouped = String::new();
     for (index, ch) in digits.chars().enumerate() {
         if index > 0 && (digits.len() - index) % 3 == 0 {
@@ -67,10 +71,10 @@ pub(crate) fn format_usd(value: f64) -> String {
         }
         grouped.push(ch);
     }
-    format!("${sign}{grouped}.{cents}")
+    format!("{sign}{grouped}")
 }
 
-pub(super) fn credits_display_value(limits: &RateLimits) -> Option<String> {
+pub(super) fn credits_display_value(provider: ProviderKind, limits: &RateLimits) -> Option<String> {
     if limits.credits.unlimited {
         return Some(crate::i18n::tr("unlimited").into());
     }
@@ -86,10 +90,16 @@ pub(super) fn credits_display_value(limits: &RateLimits) -> Option<String> {
         )
     {
         None
-    } else if limits.credits.has_credits {
-        Some(balance.into())
     } else {
-        None
+        // Codex credits are counts, while other providers may report currency.
+        // Format only at the display boundary to retain the original precision.
+        if provider == ProviderKind::Codex
+            && let Ok(value) = balance.parse::<f64>()
+            && value.is_finite()
+        {
+            return Some(group_integer_digits(&format!("{:.0}", value.round())));
+        }
+        Some(balance.into())
     }
 }
 
@@ -111,7 +121,23 @@ pub(crate) fn format_reset_in(reset: Option<DateTime<Utc>>) -> String {
         return crate::i18n::tr("unavailable").into();
     };
 
-    let remaining_minutes = (reset - Utc::now()).num_minutes().max(0);
+    format_minutes((reset - Utc::now()).num_minutes().max(0))
+}
+
+/// "2 h 5 m ago" for a moment in the past.
+pub(crate) fn format_time_ago(at: DateTime<Utc>) -> String {
+    let elapsed = format_minutes((Utc::now() - at).num_minutes().max(0));
+    crate::i18n::format("time-ago", &[("time", elapsed)])
+}
+
+/// "2 h 5 m late" for a deadline in the past.
+pub(crate) fn format_time_late(deadline: DateTime<Utc>) -> String {
+    let elapsed = format_minutes((Utc::now() - deadline).num_minutes().max(0));
+    crate::i18n::format("time-late", &[("time", elapsed)])
+}
+
+/// Compact "6 d 23 h" / "2 h 5 m" / "7 m" duration.
+fn format_minutes(remaining_minutes: i64) -> String {
     let days = remaining_minutes / 1_440;
     let hours = (remaining_minutes % 1_440) / 60;
     let minutes = remaining_minutes % 60;

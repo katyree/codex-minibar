@@ -28,6 +28,7 @@ pub mod provider;
 mod provider_cli;
 pub mod provider_registry;
 pub mod provider_status;
+pub mod reset_detection;
 pub mod reset_feed;
 pub mod scheduler;
 pub mod secrets;

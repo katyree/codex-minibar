@@ -194,6 +194,10 @@ updated = 已更新{ " " }
 
 refresh-last-updated-relative = 刷新 · 上次更新于 { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = 置顶固定并保持打开
+popup-unpin = 取消固定并在失去焦点时关闭
+
 edit-home = 编辑主页
 home-card-layout = 布局
 home-card-layout-cards = 卡片
@@ -2006,3 +2010,41 @@ cmdpal-content-hint = Dock 将条带显示为标题和下方的副标题。
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = 最多 2 个额度：一个占用标题和副标题，两个各占一行。
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = 已储存的重置
+
+# src/popup_window/ui/cards.rs
+before-when = { $when } 之前
+
+# src/popup_window/ui/cards.rs
+time-ago = { $time }前
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = 新的 Codex 储存重置信息
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Codex 可能在 { $when } 之前重置（{ $countdown } 内）
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }：可能在 { $when } 之前重置（{ $countdown } 内）
+
+# src/popup_window/ui/cards.rs
+time-late = 延迟 { $time }
+
+# Floating usage panel
+popup-floating = 浮动面板
+popup-floating-description = 保持面板打开，拖动标题栏可移动到其他位置或显示器。
+popup-always-on-top = 始终置顶
+popup-always-on-top-description = 将面板显示在其他应用上方，切换应用时保持打开。
+popup-position = 面板位置
+popup-position-description = 下次启动时恢复面板位置。
+popup-reset-position = 重置位置
+popup-drag-header = 拖动以移动
+popup-close = 关闭面板
+
+show-popup-action-bar = 显示弹出面板操作栏
+show-popup-action-bar-description = 在普通弹出面板中显示应用名称和操作按钮。浮动面板始终显示此栏。

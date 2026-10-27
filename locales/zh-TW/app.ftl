@@ -194,6 +194,10 @@ updated = 已更新{ " " }
 
 refresh-last-updated-relative = 重新整理 · 上次更新於 { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = 置頂固定並保持開啟
+popup-unpin = 取消固定並在失去焦點時關閉
+
 edit-home = 編輯首頁
 home-card-layout = 版面配置
 home-card-layout-cards = 卡片
@@ -2007,3 +2011,41 @@ muse-session-missing = Connect your signed-in Muse account from Chrome to read w
 muse-remove-session = Remove Muse session
 muse-remove-session-help = Minibar will forget the saved session credential. Your Chrome sign-in stays unchanged.
 muse-session-removed = Muse session removed
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = 已儲存的重置
+
+# src/popup_window/ui/cards.rs
+before-when = { $when } 之前
+
+# src/popup_window/ui/cards.rs
+time-ago = { $time }前
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = 新的 Codex 儲存重置資訊
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Codex 可能在 { $when } 之前重置（{ $countdown } 內）
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }：可能在 { $when } 之前重置（{ $countdown } 內）
+
+# src/popup_window/ui/cards.rs
+time-late = 延遲 { $time }
+
+# Floating usage panel
+popup-floating = 浮動面板
+popup-floating-description = 保持面板開啟，拖曳標題列可移至其他位置或螢幕。
+popup-always-on-top = 一律置頂
+popup-always-on-top-description = 將面板顯示在其他應用程式上方，切換應用程式時保持開啟。
+popup-position = 面板位置
+popup-position-description = 下次啟動時還原面板位置。
+popup-reset-position = 重設位置
+popup-drag-header = 拖曳以移動
+popup-close = 關閉面板
+
+show-popup-action-bar = 顯示彈出面板操作列
+show-popup-action-bar-description = 在一般彈出面板中顯示應用程式名稱和操作按鈕。浮動面板一律顯示此列。

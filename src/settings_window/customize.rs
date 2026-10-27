@@ -38,6 +38,47 @@ impl SettingsWindow {
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         let show_edit_button = self.settings.show_edit_home_button;
+        let floating = kit::card_of(k, |k| {
+            let reset = Button::new(
+                "popup-reset-position",
+                crate::i18n::tr("popup-reset-position"),
+            )
+            .on_click(Self::h(cx, |this, (), _, cx| {
+                this.edit(cx, |s| s.popup_position = None)
+            }))
+            .render(k);
+            vec![
+                bool_row(
+                    self,
+                    k,
+                    cx,
+                    "popup-floating",
+                    crate::i18n::tr("popup-floating"),
+                    Some(crate::i18n::tr("popup-floating-description")),
+                    |s| s.popup_floating,
+                    |s, v| {
+                        s.popup_floating = v;
+                        if v {
+                            s.popup_pinned = true;
+                        }
+                    },
+                ),
+                bool_row(
+                    self,
+                    k,
+                    cx,
+                    "popup-always-on-top",
+                    crate::i18n::tr("popup-always-on-top"),
+                    Some(crate::i18n::tr("popup-always-on-top-description")),
+                    |s| s.popup_pinned,
+                    |s, v| s.popup_pinned = v,
+                ),
+                Row::new("popup-position", crate::i18n::tr("popup-position"))
+                    .description(k, crate::i18n::tr("popup-position-description"))
+                    .trailing(reset)
+                    .render(k),
+            ]
+        });
         let layout = kit::card_of(k, |k| {
             // Starting edit mode here works whether or not the bottom bar
             // shows its Edit button, so that button can be hidden.
@@ -68,6 +109,16 @@ impl SettingsWindow {
                         set_shown(this, !show_edit_button, cx)
                     }))
                     .render(k),
+                bool_row(
+                    self,
+                    k,
+                    cx,
+                    "customize-popup-action-bar",
+                    crate::i18n::tr("show-popup-action-bar"),
+                    Some(crate::i18n::tr("show-popup-action-bar-description")),
+                    |s| s.show_popup_action_bar,
+                    |s, v| s.show_popup_action_bar = v,
+                ),
                 bool_row(
                     self,
                     k,
@@ -198,6 +249,8 @@ impl SettingsWindow {
         vec![
             kit::section_heading(k, crate::i18n::tr("layout")),
             layout,
+            kit::section_heading(k, crate::i18n::tr("popup-floating")),
+            floating,
             kit::section_heading(k, crate::i18n::tr("tabs")),
             tabs,
             kit::section_heading(k, crate::i18n::tr("cards")),

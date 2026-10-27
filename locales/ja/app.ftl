@@ -292,6 +292,10 @@ updated = 更新済み{ " " }
 # src/popup_window/ui/footer.rs
 refresh-last-updated-relative = 更新 · 最終更新: { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = 最前面に固定して開いたままにする
+popup-unpin = 固定を解除し、フォーカスを失ったら閉じる
+
 # src/popup_window/ui/home.rs
 edit-home = ホームを編集
 home-card-layout = レイアウト
@@ -2908,3 +2912,41 @@ cmdpal-content-hint = Dock はバンドをタイトルとサブタイトルの 2
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = 最大 2 つのクォータ：1 つならタイトルとサブタイトルを使い、2 つなら 1 行ずつ表示します。
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = 保存済みリセット
+
+# src/popup_window/ui/cards.rs
+before-when = { $when } まで
+
+# src/popup_window/ui/cards.rs
+time-ago = { $time }前
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = 新しいCodex保存済みリセット情報
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Codex のリセットが { $when } までに行われる可能性があります（最大 { $countdown }）
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }: { $when } までにリセットの可能性（最大 { $countdown }）
+
+# src/popup_window/ui/cards.rs
+time-late = { $time }遅延
+
+# Floating usage panel
+popup-floating = フローティングパネル
+popup-floating-description = パネルを開いたまま、ヘッダーをドラッグして位置やモニターを変更できます。
+popup-always-on-top = 常に最前面
+popup-always-on-top-description = パネルを他のアプリより手前に表示し、アプリを切り替えても開いたままにします。
+popup-position = パネルの位置
+popup-position-description = 位置は次回の起動時にも復元されます。
+popup-reset-position = 位置をリセット
+popup-drag-header = ドラッグして移動
+popup-close = パネルを閉じる
+
+show-popup-action-bar = ポップアップのアクションバーを表示
+show-popup-action-bar-description = 通常のポップアップにアプリ名と操作ボタンを表示します。フローティングパネルでは常に表示されます。

@@ -28,6 +28,11 @@ fn source(name: &str) -> Option<&'static str> {
             include_str!("../../../assets/icons/fluent-arrow-download-24-filled.svg")
         }
         "fluent-settings" => include_str!("../../../assets/icons/fluent-settings-20-filled.svg"),
+        "fluent-pin" => include_str!("../../../assets/icons/fluent-pin-20-regular.svg"),
+        "fluent-layout-column-two" => {
+            include_str!("../../../assets/icons/fluent-layout-column-two-20-regular.svg")
+        }
+        "fluent-pin-filled" => include_str!("../../../assets/icons/fluent-pin-20-filled.svg"),
         "fluent-power" => include_str!("../../../assets/icons/fluent-power-20-filled.svg"),
         "fluent-edit" => include_str!("../../../assets/icons/fluent-edit-20-filled.svg"),
         "fluent-checkmark" => {
@@ -61,6 +66,15 @@ fn source(name: &str) -> Option<&'static str> {
         "fluent-copy" => include_str!("../../../assets/icons/fluent-copy-16-regular.svg"),
         "fluent-checkmark-circle" => {
             include_str!("../../../assets/icons/fluent-checkmark-circle-16-filled.svg")
+        }
+        "fluent-arrow-reset" => {
+            include_str!("../../../assets/icons/fluent-arrow-reset-20-regular.svg")
+        }
+        "fluent-building-bank" => {
+            include_str!("../../../assets/icons/fluent-building-bank-20-regular.svg")
+        }
+        "fluent-hourglass" => {
+            include_str!("../../../assets/icons/fluent-hourglass-half-16-regular.svg")
         }
         "codex" => include_str!("../../../assets/icons/openai-iconify.svg"),
         "claude" => include_str!("../../../assets/icons/claude-iconify.svg"),
@@ -268,6 +282,9 @@ mod tests {
             "fluent-refresh",
             "fluent-arrow-download",
             "fluent-settings",
+            "fluent-pin",
+            "fluent-layout-column-two",
+            "fluent-pin-filled",
             "fluent-edit",
             "fluent-checkmark",
             "fluent-delete",
@@ -282,6 +299,9 @@ mod tests {
             "fluent-checkmark-circle",
             "fluent-clock",
             "fluent-arrow-clockwise-dashes",
+            "fluent-arrow-reset",
+            "fluent-building-bank",
+            "fluent-hourglass",
         ] {
             assert!(source(name).is_some(), "{name}");
         }

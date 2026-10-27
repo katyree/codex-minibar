@@ -295,6 +295,10 @@ updated = Aktualisiert{ " " }
 # src/popup_window/ui/footer.rs
 refresh-last-updated-relative = Aktualisieren · Zuletzt aktualisiert: { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = Im Vordergrund anheften und offen halten
+popup-unpin = Lösen und bei Fokusverlust schließen
+
 # src/popup_window/ui/home.rs
 edit-home = Startseite bearbeiten
 home-card-layout = Layout
@@ -2929,3 +2933,41 @@ cmdpal-content-hint = Das Dock zeigt ein Band als Titel über einem Untertitel.
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = Bis zu 2 Kontingente: eines füllt Titel und Untertitel, zwei je eine Zeile.
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = Gespeicherter Reset
+
+# src/popup_window/ui/cards.rs
+before-when = Vor { $when }
+
+# src/popup_window/ui/cards.rs
+time-ago = vor { $time }
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = Neue Infos zu gespeicherten Codex-Resets
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Ein möglicher Codex-Reset wird vor { $when } erwartet (innerhalb von { $countdown })
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }: möglicher Reset vor { $when } (innerhalb von { $countdown })
+
+# src/popup_window/ui/cards.rs
+time-late = { $time } verspätet
+
+# Floating usage panel
+popup-floating = Schwebendes Fenster
+popup-floating-description = Das Fenster bleibt offen. Ziehen Sie es an der Kopfzeile an eine andere Position oder auf einen anderen Monitor.
+popup-always-on-top = Immer im Vordergrund
+popup-always-on-top-description = Das Fenster über anderen Anwendungen anzeigen und beim App-Wechsel offen halten.
+popup-position = Fensterposition
+popup-position-description = Die Position wird zwischen Sitzungen gespeichert.
+popup-reset-position = Position zurücksetzen
+popup-drag-header = Zum Verschieben ziehen
+popup-close = Fenster schließen
+
+show-popup-action-bar = Aktionsleiste im Popup anzeigen
+show-popup-action-bar-description = App-Titel und Aktionen im normalen Popup anzeigen. Schwebende Fenster zeigen diese Leiste immer.

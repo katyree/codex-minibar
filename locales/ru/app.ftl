@@ -290,6 +290,10 @@ updated = Обновлено{ " " }
 # src/popup_window/ui/footer.rs
 refresh-last-updated-relative = Обновить | Последнее обновление: { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = Закрепить поверх окон и не закрывать
+popup-unpin = Открепить и закрывать при потере фокуса
+
 # src/popup_window/ui/home.rs
 edit-home = Изменить главную
 home-card-layout = Вид
@@ -2935,3 +2939,41 @@ cmdpal-content-hint = Док показывает бэнд как заголов
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = До 2 квот: одна занимает заголовок и подзаголовок, две — по строке.
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Банк-сброс Tibo™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = Сохранённый сброс
+
+# src/popup_window/ui/cards.rs
+before-when = До { $when }
+
+# src/popup_window/ui/cards.rs
+time-ago = { $time } назад
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = Новые сведения о сохранённом сбросе Codex
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Возможный сброс Codex ожидается до { $when } (в течение { $countdown })
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }: возможный сброс до { $when } (в течение { $countdown })
+
+# src/popup_window/ui/cards.rs
+time-late = опоздание { $time }
+
+# Floating usage panel
+popup-floating = Плавающая панель
+popup-floating-description = Панель остаётся открытой; перетаскивайте её за заголовок в любое место или на другой монитор.
+popup-always-on-top = Поверх всех окон
+popup-always-on-top-description = Показывать панель поверх других приложений и не закрывать при переключении между ними.
+popup-position = Положение панели
+popup-position-description = Положение сохраняется между запусками.
+popup-reset-position = Сбросить положение
+popup-drag-header = Перетащите, чтобы переместить
+popup-close = Закрыть панель
+
+show-popup-action-bar = Показывать панель действий попапа
+show-popup-action-bar-description = Показывать название приложения и кнопки действий в обычном попапе. В плавающей панели эта строка видна всегда.

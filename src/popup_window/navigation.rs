@@ -351,7 +351,7 @@ pub(super) fn popup_sections(
     if limits.usage.has_data() {
         sections.push(PopupSection::UsageStatistics);
     }
-    if credits_display_value(limits).is_some() {
+    if credits_display_value(provider, limits).is_some() {
         sections.push(PopupSection::Credits);
     }
     sections

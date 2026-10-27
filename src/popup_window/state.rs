@@ -66,7 +66,7 @@ pub struct AppState {
     pub limits: Mutex<ProviderLimits>,
     /// Latest valid public forced-reset announcements. Kept outside UiState so
     /// hidden popups avoid a full native-tree publish on every feed poll.
-    pub forced_resets: Mutex<Vec<crate::reset_feed::ForcedReset>>,
+    pub forced_resets: Mutex<Vec<crate::reset_feed::AnnouncedReset>>,
     /// Ongoing status-page incidents of watched drivers.
     pub provider_statuses: Mutex<Vec<crate::provider_status::ProviderStatus>>,
     pub commands: Mutex<HashMap<ProviderId, Sender<WorkerCommand>>>,
@@ -176,14 +176,14 @@ impl AppState {
             .unwrap_or_default()
     }
 
-    pub(super) fn current_forced_resets(&self) -> Vec<crate::reset_feed::ForcedReset> {
+    pub(super) fn current_forced_resets(&self) -> Vec<crate::reset_feed::AnnouncedReset> {
         self.forced_resets
             .lock()
             .map(|resets| resets.clone())
             .unwrap_or_default()
     }
 
-    pub(super) fn replace_forced_resets(&self, resets: Vec<crate::reset_feed::ForcedReset>) {
+    pub(super) fn replace_forced_resets(&self, resets: Vec<crate::reset_feed::AnnouncedReset>) {
         if let Ok(mut current) = self.forced_resets.lock() {
             *current = resets;
         }
@@ -244,14 +244,49 @@ impl AppState {
         ));
     }
 
+    fn send_reset_feed(&self, command: crate::reset_feed::ResetFeedCommand) {
+        if let Ok(worker) = self.reset_feed_worker.lock()
+            && let Some(worker) = worker.as_ref()
+        {
+            let _ = worker.commands.send(command);
+        }
+    }
+
     pub(super) fn mark_forced_reset_info_notified(&self, id: String) {
-        let Ok(worker) = self.reset_feed_worker.lock() else {
+        self.send_reset_feed(crate::reset_feed::ResetFeedCommand::MarkNotified(id));
+    }
+
+    /// Feeds a Codex quota sample to announced-reset detection. The previous
+    /// snapshot goes first: on the very first run it is the persisted sample
+    /// from the last session, which lets a reset that landed while the app
+    /// was closed be recognized. Samples the detector already has are ignored.
+    pub(super) fn observe_reset_limits(
+        &self,
+        provider: ProviderId,
+        previous: Option<&RateLimits>,
+        current: &RateLimits,
+    ) {
+        if provider.kind() != ProviderKind::Codex {
             return;
-        };
-        if let Some(worker) = worker.as_ref() {
-            let _ = worker
-                .commands
-                .send(crate::reset_feed::ResetFeedCommand::MarkNotified(id));
+        }
+        for limits in previous.into_iter().chain([current]) {
+            if let Some(observation) = crate::reset_detection::Observation::from_limits(limits) {
+                self.send_reset_feed(crate::reset_feed::ResetFeedCommand::Observe(
+                    provider.id().to_owned(),
+                    Box::new(observation),
+                ));
+            }
+        }
+    }
+
+    /// A reset credit spent from the popup, so detection does not mistake
+    /// its effect for an announced forced reset.
+    pub(super) fn record_banked_reset_use(&self, provider: ProviderId) {
+        if provider.kind() == ProviderKind::Codex {
+            self.send_reset_feed(crate::reset_feed::ResetFeedCommand::RecordBankedUse(
+                provider.id().to_owned(),
+                Utc::now(),
+            ));
         }
     }
 
@@ -395,6 +430,11 @@ pub(crate) struct UiState {
     pub(super) total_spend_period: TotalSpendPeriod,
     pub(super) show_account_name: bool,
     pub(super) show_edit_home_button: bool,
+    pub(super) show_popup_action_bar: bool,
+    pub(super) popup_pinned: bool,
+    pub(super) popup_floating: bool,
+    pub(super) popup_height_dip: Option<u32>,
+    pub(super) popup_position: Option<crate::settings::PopupPosition>,
     /// Every configured instance in display order, enabled or not.
     pub(super) instances: Vec<ProviderInstance>,
     pub(super) popup_tab_mode: PopupTabMode,
@@ -446,6 +486,11 @@ impl Default for UiState {
             total_spend_period: TotalSpendPeriod::default(),
             show_account_name: false,
             show_edit_home_button: true,
+            show_popup_action_bar: true,
+            popup_pinned: false,
+            popup_floating: false,
+            popup_height_dip: None,
+            popup_position: None,
             instances: Settings::default().instances,
             popup_tab_mode: PopupTabMode::default(),
             grouped_tab_selection: Default::default(),
@@ -461,6 +506,9 @@ impl Default for UiState {
 }
 
 impl UiState {
+    pub(super) fn compact_bar_visible(&self) -> bool {
+        self.popup_floating || self.show_popup_action_bar
+    }
     /// Shared seed for both the render tree and the background bridge. The
     /// bridge publishes a complete snapshot, so it must restore layout and
     /// effective usage eligibility before either path can produce a first frame.
@@ -471,6 +519,8 @@ impl UiState {
             popup_tab_mode: settings.popup_tab_mode,
             grouped_tab_selection: settings.grouped_tab_selection.clone(),
             popup_two_columns: settings.popup_two_columns,
+            show_popup_action_bar: settings.show_popup_action_bar,
+            popup_floating: settings.popup_floating,
             popup_home_order: settings.popup_home_order.clone(),
             popup_home_right_column: settings.popup_home_right_column.clone(),
             popup_home_card_layouts: settings.popup_home_card_layouts.clone(),
@@ -504,6 +554,11 @@ impl UiState {
         self.total_spend_period = settings.total_spend_period;
         self.show_account_name = settings.show_account_name;
         self.show_edit_home_button = settings.show_edit_home_button;
+        self.show_popup_action_bar = settings.show_popup_action_bar;
+        self.popup_pinned = settings.popup_pinned;
+        self.popup_floating = settings.popup_floating;
+        self.popup_height_dip = settings.popup_height_dip;
+        self.popup_position = settings.popup_position.clone();
         self.instances = settings.instances.clone();
         self.popup_tab_mode = settings.popup_tab_mode;
         self.grouped_tab_selection = settings.grouped_tab_selection.clone();

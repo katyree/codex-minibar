@@ -296,6 +296,10 @@ updated = Mise à jour{ " " }
 # src/popup_window/ui/footer.rs
 refresh-last-updated-relative = Actualiser · Dernière mise à jour : { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = Épingler au premier plan et garder ouvert
+popup-unpin = Désépingler et fermer à la perte de focus
+
 # src/popup_window/ui/home.rs
 edit-home = Modifier l'accueil
 home-card-layout = Disposition
@@ -2936,3 +2940,41 @@ cmdpal-content-hint = Le Dock affiche une bande sous forme de titre au-dessus d�
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = Jusqu’à 2 quotas : un remplit le titre et le sous-titre, deux occupent une ligne chacun.
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = Réinitialisation en réserve
+
+# src/popup_window/ui/cards.rs
+before-when = Avant { $when }
+
+# src/popup_window/ui/cards.rs
+time-ago = il y a { $time }
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = Nouvelles informations sur une réinitialisation Codex en réserve
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Une éventuelle réinitialisation de Codex est attendue avant { $when } (d'ici { $countdown })
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label } : réinitialisation possible avant { $when } (d'ici { $countdown })
+
+# src/popup_window/ui/cards.rs
+time-late = { $time } de retard
+
+# Floating usage panel
+popup-floating = Panneau flottant
+popup-floating-description = Gardez le panneau ouvert et faites glisser son en-tête vers une autre position ou un autre écran.
+popup-always-on-top = Toujours au premier plan
+popup-always-on-top-description = Garder le panneau au-dessus des autres applications et ouvert lors du changement d’application.
+popup-position = Position du panneau
+popup-position-description = La position est conservée entre les sessions.
+popup-reset-position = Réinitialiser la position
+popup-drag-header = Faire glisser pour déplacer
+popup-close = Fermer le panneau
+
+show-popup-action-bar = Afficher la barre d’actions du panneau
+show-popup-action-bar-description = Afficher le titre et les actions dans le panneau normal. Les panneaux flottants affichent toujours cette barre.

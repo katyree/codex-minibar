@@ -1,4 +1,4 @@
-//! Footer: page tabs on the left, refresh/settings/update on the right.
+//! Shared compact action bar and footer tabs with refresh/settings/update.
 
 use std::rc::Rc;
 
@@ -15,6 +15,9 @@ use super::{
     theme::{HslaExt, Palette},
 };
 use crate::popup_window::{model, *};
+
+pub(super) const FLOATING_HEADER_HEIGHT: f32 = 32.0;
+pub(super) const FLOATING_HEADER_ACTIONS_WIDTH: f32 = 112.0;
 
 /// Payload carried while a provider tab is dragged to a new position.
 #[derive(Clone)]
@@ -63,6 +66,115 @@ struct TabSpec {
 }
 
 impl PopupRoot {
+    fn render_pin_button(&mut self, button: f32, glyph: f32, cx: &mut Context<Self>) -> AnyElement {
+        let pinned = self.ui.popup_pinned;
+        self.render_action_button(
+            "pin",
+            if pinned {
+                "fluent-pin-filled"
+            } else {
+                "fluent-pin"
+            },
+            crate::i18n::tr(if pinned { "popup-unpin" } else { "popup-pin" }).into(),
+            button,
+            glyph,
+            pinned,
+            cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_user_pin(cx)),
+            cx,
+        )
+    }
+
+    pub(super) fn render_floating_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let editing = self.home_editing;
+        let edit_presence = self.fx.toggle(
+            fx::key("compact-edit-presence"),
+            self.ui.show_edit_home_button || editing,
+            fx::NORMAL,
+        );
+        let edit = self.render_action_button(
+            "floating-edit-home",
+            if editing {
+                "fluent-checkmark"
+            } else {
+                "fluent-edit"
+            },
+            crate::i18n::tr(if editing { "done" } else { "edit-home" }).into(),
+            24.0,
+            16.0,
+            editing,
+            cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.set_home_editing(!this.home_editing, cx)
+            }),
+            cx,
+        );
+        let columns = self.render_action_button(
+            "two-columns",
+            "fluent-layout-column-two",
+            crate::i18n::tr("use-two-columns").into(),
+            24.0,
+            16.0,
+            self.ui.popup_two_columns,
+            cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_two_columns(cx)),
+            cx,
+        );
+        let pin = self.render_pin_button(24.0, 16.0, cx);
+        let close = self.render_action_button(
+            "close-popup",
+            "fluent-dismiss",
+            crate::i18n::tr("popup-close").into(),
+            24.0,
+            16.0,
+            false,
+            cx.listener(|_, _: &ClickEvent, _, _| crate::popup::hide()),
+            cx,
+        );
+        div()
+            .relative()
+            .size_full()
+            .child(
+                div()
+                    .absolute()
+                    .left_0()
+                    .right(px(FLOATING_HEADER_ACTIONS_WIDTH))
+                    .h(px(FLOATING_HEADER_HEIGHT))
+                    .flex()
+                    .items_center()
+                    .pl(px(10.0))
+                    .gap(px(8.0))
+                    .text_size(px(12.0))
+                    .text_color(self.palette.text_secondary)
+                    .child(crate::settings_window::kit::image(
+                        "color/app-icon-32.png",
+                        16.0,
+                    ))
+                    .child("Codex Minibar"),
+            )
+            .child(
+                div()
+                    .id("floating-header-actions")
+                    .absolute()
+                    .right(px(4.0))
+                    .top(px(4.0))
+                    .flex()
+                    .children((edit_presence > 0.0).then(|| {
+                        div()
+                            .relative()
+                            .flex_none()
+                            .w(px(28.0 * edit_presence))
+                            .h(px(24.0))
+                            .overflow_hidden()
+                            .opacity(edit_presence)
+                            .child(div().absolute().left_0().top_0().child(edit))
+                    }))
+                    .child(columns)
+                    .child(div().w(px(4.0)).flex_none())
+                    .child(pin)
+                    .child(div().w(px(4.0)).flex_none())
+                    .child(close),
+            )
+            .into_any_element()
+    }
+
     fn tab_specs(&self) -> Vec<TabSpec> {
         let ui = Rc::clone(&self.ui);
         let current = self.pager.current;
@@ -138,16 +250,22 @@ impl PopupRoot {
         let tabs = self.tab_specs();
         let step = button + spacing;
         let content_width = tabs.len() as f32 * step - spacing;
-        // Customize can hide the Edit button; it still appears as Done while
-        // editing (started from Settings) so edit mode can always be left.
+        // Restore essential controls here when the popup action bar is hidden.
         let editing = self.home_editing;
         let edit_presence = self.fx.toggle(
             fx::key("footer-edit-presence"),
-            self.ui.show_edit_home_button || editing,
+            !self.ui.compact_bar_visible() && (self.ui.show_edit_home_button || editing),
             fx::NORMAL,
         );
-        let action_count =
-            2.0 + edit_presence + f32::from(u8::from(self.ui.update_version.is_some()));
+        let pin_presence = self.fx.toggle(
+            fx::key("footer-pin-presence"),
+            !self.ui.compact_bar_visible(),
+            fx::NORMAL,
+        );
+        let action_count = 2.0
+            + pin_presence
+            + edit_presence
+            + f32::from(u8::from(self.ui.update_version.is_some()));
         let viewport_width = capsule_width
             - 2.0
             - size.tab_padding_left() as f32
@@ -251,6 +369,18 @@ impl PopupRoot {
                             .right(px(gap))
                             .child(button_element),
                     ),
+            );
+        }
+        if pin_presence > 0.0 {
+            let pin = self.render_pin_button(button, size.icon_glyph_size() as f32, cx);
+            actions = actions.child(
+                div()
+                    .relative()
+                    .w(px((button + gap) * pin_presence))
+                    .h(px(button))
+                    .overflow_hidden()
+                    .opacity(pin_presence)
+                    .child(div().absolute().left_0().top_0().child(pin)),
             );
         }
         actions = actions

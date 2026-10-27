@@ -442,16 +442,64 @@ fn credits_only_render_for_a_real_balance_or_unlimited_access() {
     let mut limits = plan_limits("plus");
     limits.credits.has_credits = true;
     limits.credits.balance = Some("undefined".into());
-    assert_eq!(credits_display_value(&limits), None);
+    assert_eq!(credits_display_value(ProviderKind::Codex, &limits), None);
     assert!(!popup_sections(ProviderKind::Codex, &limits, false).contains(&PopupSection::Credits));
 
     limits.credits.balance = Some("$12.50".into());
-    assert_eq!(credits_display_value(&limits).as_deref(), Some("$12.50"));
+    assert_eq!(
+        credits_display_value(ProviderKind::Codex, &limits).as_deref(),
+        Some("$12.50")
+    );
     assert!(popup_sections(ProviderKind::Codex, &limits, false).contains(&PopupSection::Credits));
 
     limits.credits = Default::default();
     limits.credits.unlimited = true;
-    assert_eq!(credits_display_value(&limits).as_deref(), Some("Unlimited"));
+    assert_eq!(
+        credits_display_value(ProviderKind::Codex, &limits).as_deref(),
+        Some("Unlimited")
+    );
+}
+
+#[test]
+fn codex_credits_display_whole_grouped_counts_without_changing_the_balance() {
+    for (balance, expected) in [
+        ("53556.3441260001", "53,556"),
+        (" 53556.8 ", "53,557"),
+        ("999.5", "1,000"),
+        ("1000000", "1,000,000"),
+        ("0", "0"),
+        ("0.4", "0"),
+    ] {
+        let mut limits = plan_limits("plus");
+        limits.credits.has_credits = true;
+        limits.credits.balance = Some(balance.into());
+        assert_eq!(
+            credits_display_value(ProviderKind::Codex, &limits).as_deref(),
+            Some(expected)
+        );
+        assert_eq!(limits.credits.balance.as_deref(), Some(balance));
+        assert_eq!(
+            credits_display_value(ProviderKind::CommandCode, &limits).as_deref(),
+            Some(balance.trim())
+        );
+        for surface in [PopupSurface::HomeTab, PopupSurface::ProviderTab] {
+            let cards = test_cards(
+                ProviderKind::Codex,
+                true,
+                &limits,
+                &all_visible(),
+                surface,
+                true,
+                true,
+                true,
+            );
+            assert!(
+                cards
+                    .iter()
+                    .any(|card| matches!(card, Card::Credits { value } if value == expected))
+            );
+        }
+    }
 }
 
 #[test]
@@ -1436,4 +1484,81 @@ fn login_notices_offer_sign_in_only_where_minibar_can_sign_in() {
         ),
         None
     );
+}
+
+#[test]
+fn announced_reset_rows_track_reception_per_instance() {
+    use crate::reset_feed::{AnnouncedReset, ResetKind, ResetTiming};
+    let now = Utc.with_ymd_and_hms(2026, 10, 23, 12, 0, 0).unwrap();
+    let codex = id(ProviderKind::Codex);
+    let other = ProviderId::new(ProviderKind::Codex, "codex-work");
+    let reset = |id: &str, kind, hours: i64| AnnouncedReset {
+        id: id.into(),
+        kind,
+        timing: ResetTiming::Exact,
+        source_url: None,
+        label: None,
+        reset_at: now + ChronoDuration::hours(hours),
+        not_before: None,
+        received: Default::default(),
+    };
+    let mut resets = vec![
+        reset("long-missed", ResetKind::Forced, -72),
+        reset("superseded", ResetKind::Forced, -30),
+        reset("missed-banked", ResetKind::Banked, -20),
+        reset("received", ResetKind::Forced, -2),
+        reset("upcoming", ResetKind::Forced, 3),
+    ];
+    resets[3]
+        .received
+        .insert(codex.id().to_owned(), now - ChronoDuration::minutes(10));
+
+    let phases = |provider| {
+        visible_announced_resets(&resets, provider, now)
+            .into_iter()
+            .map(|row| (row.reset.id.as_str(), row.phase))
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(
+        phases(codex),
+        [
+            ("missed-banked", AnnouncedResetPhase::Missed),
+            (
+                "received",
+                AnnouncedResetPhase::Received(now - ChronoDuration::minutes(10))
+            ),
+            ("upcoming", AnnouncedResetPhase::Upcoming),
+        ]
+    );
+    assert_eq!(
+        phases(other),
+        [
+            ("superseded", AnnouncedResetPhase::Missed),
+            ("missed-banked", AnnouncedResetPhase::Missed),
+            ("received", AnnouncedResetPhase::Missed),
+        ]
+    );
+}
+#[test]
+fn action_bar_visibility_setting_only_controls_the_regular_popup() {
+    for floating in [false, true] {
+        for shown in [false, true] {
+            let settings = Settings {
+                popup_floating: floating,
+                show_popup_action_bar: shown,
+                ..Settings::default()
+            };
+            let mut ui = UiState::popup_layout_from_settings(&settings);
+            assert_eq!(ui.compact_bar_visible(), floating || shown);
+            let updated = Settings {
+                popup_floating: floating,
+                show_popup_action_bar: !shown,
+                ..settings
+            };
+            ui.apply_settings(&updated);
+            assert_eq!(ui.show_popup_action_bar, !shown);
+            assert_eq!(ui.compact_bar_visible(), floating || !shown);
+        }
+    }
 }

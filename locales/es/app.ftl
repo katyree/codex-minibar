@@ -197,6 +197,10 @@ updated = Actualizado{ " " }
 
 refresh-last-updated-relative = Actualizar · Última actualización { $relative }
 
+# src/popup_window/ui/footer.rs
+popup-pin = Fijar encima y mantener abierto
+popup-unpin = Desfijar y cerrar al perder el foco
+
 edit-home = Editar inicio
 home-card-layout = Diseño
 home-card-layout-cards = Tarjetas
@@ -2027,3 +2031,41 @@ cmdpal-content-hint = El Dock muestra una banda como un título sobre un subtít
 
 # src/settings_window/command_palette.rs
 cmdpal-indicators-hint = Hasta 2 cuotas: una ocupa el título y el subtítulo; dos, una línea cada una.
+
+# src/popup_window/ui/cards.rs
+tibo-banked-reset = Tibo Banked Reset™
+
+# src/popup_window/ui/cards.rs
+banked-reset-credit = Restablecimiento guardado
+
+# src/popup_window/ui/cards.rs
+before-when = Antes de { $when }
+
+# src/popup_window/ui/cards.rs
+time-ago = hace { $time }
+
+# src/popup_window/ui/cards.rs
+new-codex-banked-reset-info = Nueva información de restablecimiento guardado de Codex
+
+# src/popup_window/ui/cards.rs
+a-possible-codex-reset-is-expected-before-when-within-countdown = Se espera un posible restablecimiento de Codex antes de { $when } (en menos de { $countdown })
+
+# src/popup_window/ui/cards.rs
+label-possible-reset-before-when-within-countdown = { $label }: posible restablecimiento antes de { $when } (en menos de { $countdown })
+
+# src/popup_window/ui/cards.rs
+time-late = { $time } de retraso
+
+# Floating usage panel
+popup-floating = Panel flotante
+popup-floating-description = Mantén el panel abierto y arrastra su cabecera a otra posición o monitor.
+popup-always-on-top = Siempre visible
+popup-always-on-top-description = Mantener el panel encima de otras aplicaciones y abierto al cambiar de aplicación.
+popup-position = Posición del panel
+popup-position-description = La posición se recuerda entre sesiones.
+popup-reset-position = Restablecer posición
+popup-drag-header = Arrastra para mover
+popup-close = Cerrar panel
+
+show-popup-action-bar = Mostrar barra de acciones del panel emergente
+show-popup-action-bar-description = Mostrar el título y las acciones en el panel emergente normal. Los paneles flotantes siempre muestran esta barra.
