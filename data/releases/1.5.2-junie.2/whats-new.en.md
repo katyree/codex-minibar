@@ -1,0 +1,1 @@
+**Muse session validation fixed.** Valid saved Muse cookies no longer fail the session check because of missing browser request headers. Weekly usage polling and the Settings connection check use the corrected request.

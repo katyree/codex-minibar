@@ -199,8 +199,13 @@ fn request(
             .set("Content-Type", "text/plain;charset=UTF-8")
             .send_string(r#"[{"includeAgreement":false}]"#)
     } else if path == AUTH_CHECK {
+        // Muse rejects this POST without same-origin Fetch Metadata, even
+        // when the saved session cookie is valid.
         req.set("Accept", "application/json")
             .set("Origin", ORIGIN)
+            .set("Sec-Fetch-Site", "same-origin")
+            .set("Sec-Fetch-Mode", "cors")
+            .set("Sec-Fetch-Dest", "empty")
             .set("Cache-Control", "no-store")
             .send_string("")
     } else {
@@ -435,6 +440,26 @@ impl Activator for MuseActivator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "uses a saved Muse credential and the live service; may persist renewed cookies"]
+    fn live_saved_session_reads_weekly_usage() -> Result<()> {
+        let instance_id = std::env::var("CODEX_MINIBAR_MUSE_TEST_INSTANCE").map_err(|_| {
+            anyhow::anyhow!(
+                "Set CODEX_MINIBAR_MUSE_TEST_INSTANCE to a configured Muse instance id."
+            )
+        })?;
+        let limits = MuseClient::new(&instance_id).read_limits()?;
+        ensure!(
+            limits.secondary.used_percent.is_some(),
+            "Muse returned no weekly usage."
+        );
+        ensure!(
+            limits.secondary.resets_at.is_some(),
+            "Muse returned no weekly reset."
+        );
+        Ok(())
+    }
 
     #[test]
     fn keeps_rotated_cookies_for_following_requests_and_rejects_other_scopes() {

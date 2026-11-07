@@ -87,6 +87,14 @@ When you need icons, download them from iocnify. Icon pack - Phosphor Icons for 
 
 All layout shifts have to be animated, respect the user's preference for animations.
 
+## Muse live verification
+
+Muse's `POST /api/auth/check` requires same-origin Fetch Metadata headers.
+To verify an authorized saved session through the real client, set
+`CODEX_MINIBAR_MUSE_TEST_INSTANCE` to its configured instance id and run
+`./cargo-worktree.ps1 test --lib muse::tests::live_saved_session_reads_weekly_usage --locked '--' --ignored --exact`.
+This opt-in test contacts Muse and can persist renewed cookies. It does not launch the app or print credentials.
+
 ## Linux
 
 The app also targets Linux (X11 and Wayland). `cfg(not(windows))` code is the Linux
