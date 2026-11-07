@@ -171,6 +171,51 @@ pub fn save(name: &str, value: Option<&str>) -> Result<()> {
     save_many(&[(name.to_owned(), value.map(str::to_owned))])
 }
 
+/// Publish a background credential rotation only if its source is still saved.
+pub(crate) fn save_if_unchanged(name: &str, expected: &str, value: Option<&str>) -> Result<bool> {
+    save_if_unchanged_to(&path()?, name, expected, value)
+}
+
+fn save_if_unchanged_to(
+    path: &Path,
+    name: &str,
+    expected: &str,
+    value: Option<&str>,
+) -> Result<bool> {
+    let (encoded, expected_generation) = {
+        let _guard = operation_guard()?;
+        (read_encoded(path, name)?, generation(path, name))
+    };
+    let Some(encoded) = encoded else {
+        return Ok(false);
+    };
+    // Keyring access must not hold OPERATIONS, which UI reads also acquire.
+    let current = decode(&encoded)?.map(zeroize::Zeroizing::new);
+    if current.as_ref().map(|secret| secret.as_str()) != Some(expected) {
+        return Ok(false);
+    }
+    prepare_save(&[(name.to_owned(), value.map(str::to_owned))])?;
+    save_if_encoded_unchanged_to(path, name, &encoded, expected_generation, value)
+}
+
+fn save_if_encoded_unchanged_to(
+    path: &Path,
+    name: &str,
+    expected_encoded: &str,
+    expected_generation: u64,
+    value: Option<&str>,
+) -> Result<bool> {
+    let _guard = operation_guard()?;
+    // Settings may replace or remove the credential while the keyring is open.
+    if generation(path, name) != expected_generation
+        || read_encoded(path, name)?.as_deref() != Some(expected_encoded)
+    {
+        return Ok(false);
+    }
+    save_many_to(path, &[(name.to_owned(), value.map(str::to_owned))])?;
+    Ok(true)
+}
+
 /// Applies several secret changes through one protected-file replacement.
 /// Validation and DPAPI encryption happen before the existing file changes,
 /// so account-level edits cannot leave only part of their keys updated.
@@ -432,6 +477,81 @@ fn unprotect(data: &[u8]) -> Result<Vec<u8>> {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn credential_rotation_preserves_manual_replacement_and_removal() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("provider-secrets.json");
+        save_many_to(
+            &path,
+            &[("muse.session.test".into(), Some("test-original".into()))],
+        )?;
+        assert!(save_if_unchanged_to(
+            &path,
+            "muse.session.test",
+            "test-original",
+            Some("test-rotated")
+        )?);
+        assert_eq!(
+            load_from(&path, "muse.session.test")?.as_deref(),
+            Some("test-rotated")
+        );
+
+        let encoded = read_encoded(&path, "muse.session.test")?.unwrap();
+        let expected_generation = generation(&path, "muse.session.test");
+        save_many_to(
+            &path,
+            &[("muse.session.test".into(), Some("test-manual".into()))],
+        )?;
+        // A replacement during the unlocked keyring work wins the final CAS.
+        assert!(!save_if_encoded_unchanged_to(
+            &path,
+            "muse.session.test",
+            &encoded,
+            expected_generation,
+            Some("test-stale")
+        )?);
+        assert!(!save_if_unchanged_to(
+            &path,
+            "muse.session.test",
+            "test-rotated",
+            Some("test-stale")
+        )?);
+        assert_eq!(
+            load_from(&path, "muse.session.test")?.as_deref(),
+            Some("test-manual")
+        );
+
+        let encoded = read_encoded(&path, "muse.session.test")?.unwrap();
+        let expected_generation = generation(&path, "muse.session.test");
+        let rollback = apply_with_rollback_to(
+            &path,
+            &[("muse.session.test".into(), Some("test-temporary".into()))],
+        )?;
+        restore_encoded_to(&path, &rollback)?;
+        assert_eq!(
+            read_encoded(&path, "muse.session.test")?.as_deref(),
+            Some(encoded.as_str())
+        );
+        // A rollback can restore identical ciphertext, but its generation changed.
+        assert!(!save_if_encoded_unchanged_to(
+            &path,
+            "muse.session.test",
+            &encoded,
+            expected_generation,
+            Some("test-stale")
+        )?);
+
+        save_many_to(&path, &[("muse.session.test".into(), None)])?;
+        assert!(!save_if_unchanged_to(
+            &path,
+            "muse.session.test",
+            "test-manual",
+            Some("test-stale")
+        )?);
+        assert!(!path.exists());
+        Ok(())
+    }
 
     #[test]
     fn rollback_does_not_overwrite_a_newer_secret_update() -> Result<()> {

@@ -5,3 +5,4 @@
 - Apply settings immediately across open windows and background workers, with faster usage-history scans.
 - Get fixes for Claude account renewal and Cursor encrypted tokens on Windows.
 - Keep Junie shared-credit quotas, Muse weekly usage, and updates from this fork.
+- Retain renewed Muse session cookies without overwriting credentials changed in Settings.
