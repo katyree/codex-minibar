@@ -129,6 +129,9 @@ CONTROL
 build_rpm() {
     local topdir="$stage/rpm"
     local rpm_root="$stage/rpm-root"
+    # RPM reserves '-' for the release separator; '~' orders prereleases
+    # before the corresponding stable version.
+    local rpm_version="${version/-/~}"
     install_tree "$rpm_root/usr"
     mkdir -p "$topdir"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
     # Libraries the binary links are found by rpm's automatic dependencies.
@@ -136,7 +139,7 @@ build_rpm() {
     # listed by name; the names resolve on Fedora and openSUSE alike.
     cat > "$topdir/SPECS/codex-minibar.spec" <<SPEC
 Name:           codex-minibar
-Version:        $version
+Version:        $rpm_version
 Release:        1
 Summary:        Tray companion for monitoring AI tools usage
 License:        Apache-2.0
@@ -177,7 +180,7 @@ SPEC
         --define "_build_id_links none" \
         "$topdir/SPECS/codex-minibar.spec" >/dev/null
     local rpm="$dist/codex-minibar-$version-1.$rpmarch.rpm"
-    cp "$topdir/RPMS/$rpmarch/codex-minibar-$version-1.$rpmarch.rpm" "$rpm"
+    cp "$topdir/RPMS/$rpmarch/codex-minibar-$rpm_version-1.$rpmarch.rpm" "$rpm"
     echo "Built $rpm"
 }
 
