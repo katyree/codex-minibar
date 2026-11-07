@@ -97,9 +97,10 @@ This opt-in test contacts Muse and can persist renewed cookies. It does not laun
 
 ## Linux
 
-This fork's CI and releases target Windows only (x86, x64, ARM64), plus the
+This fork's CI and releases target Windows x64 only, plus the
 Stream Deck plugin. Linux source and manual build scripts remain available;
-do not re-enable Linux CI or release packages without a user request.
+do not re-enable Linux, x86, or ARM64 automated builds or release packages without
+a user request. Local `build.ps1` packaging also defaults to x64.
 
 The app also targets Linux (X11 and Wayland). `cfg(not(windows))` code is the Linux
 build; desktop integration lives in `src/linux/` (StatusNotifierItem tray via `ksni`,

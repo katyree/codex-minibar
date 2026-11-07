@@ -44,7 +44,7 @@ jobs:
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Source extension version: $version"
           $changed = $env:FORCE -eq "true"
-          foreach ($arch in "x64", "arm64") {
+          foreach ($arch in "x64") {
             $packed = "data/CodexMinibar.CommandPalette_$arch.msix"
             $packedVersion = ""
             if (Test-Path -LiteralPath $packed) {
@@ -76,7 +76,7 @@ jobs:
         working-directory: cmdpal/CodexMinibar.CommandPalette
         run: |
           $ErrorActionPreference = "Stop"
-          foreach ($platform in "x64", "ARM64") {
+          foreach ($platform in "x64") {
             dotnet build -c Release -p:Platform=$platform -p:GenerateAppxPackageOnBuild=true -nologo
             if ($LASTEXITCODE -ne 0) {
               throw "dotnet build failed for $platform with exit code $LASTEXITCODE"
@@ -90,7 +90,7 @@ jobs:
           VERSION: ${{ steps.check.outputs.version }}
         run: |
           $ErrorActionPreference = "Stop"
-          foreach ($arch in "x64", "arm64") {
+          foreach ($arch in "x64") {
             $built = Get-ChildItem -Path cmdpal/dist -Recurse -Filter "CodexMinibar.CommandPalette_$($env:VERSION)_$arch.msix" |
               Select-Object -First 1
             if (-not $built) {

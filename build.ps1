@@ -1,4 +1,4 @@
-# Builds multi-arch portable zips and NSIS installers into dist/<version>/.
+# Builds x64 portable zips and NSIS installers into dist/<version>/ by default.
 # Usage:
 #   .\build.ps1
 #   .\build.ps1 -Arch x64,arm64
@@ -8,7 +8,7 @@
 param(
     [string]$OutDir = "dist",
     [ValidateSet("x86", "x64", "arm64")]
-    [string[]]$Arch = @("x86", "x64", "arm64"),
+    [string[]]$Arch = @("x64"),
     [switch]$SkipInstaller
 )
 

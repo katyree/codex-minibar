@@ -59,16 +59,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 90
     strategy:
-      # A release needs every architecture, so stop the others on first failure.
       fail-fast: true
       matrix:
         include:
-          - arch: x86
-            target: i686-pc-windows-msvc
           - arch: x64
             target: x86_64-pc-windows-msvc
-          - arch: arm64
-            target: aarch64-pc-windows-msvc
     env:
       CARGO_NET_GIT_FETCH_WITH_CLI: true
     steps:
@@ -81,7 +76,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          # Per-arch caches; jobs run in parallel and build disjoint targets.
+          # Keep using the existing x64 release cache.
           key: ${{ matrix.arch }}
           cache-on-failure: true
 
