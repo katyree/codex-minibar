@@ -1173,7 +1173,7 @@ impl SettingsWindow {
                 self.run_dialog_then(
                     cx,
                     move || {
-                        crate::muse::verify_session(&cookie)?;
+                        let cookie = crate::muse::verify_session(&cookie)?;
                         control.begin_save()?;
                         persist_muse_session(settings_tx, provider, Some(&cookie))
                     },

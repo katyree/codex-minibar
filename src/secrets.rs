@@ -138,6 +138,26 @@ pub fn save(name: &str, value: Option<&str>) -> Result<()> {
     save_many(&[(name.to_owned(), value.map(str::to_owned))])
 }
 
+/// Publish a background credential rotation only if its source is still saved.
+pub(crate) fn save_if_unchanged(name: &str, expected: &str, value: Option<&str>) -> Result<bool> {
+    let _guard = operation_guard()?;
+    save_if_unchanged_to(&path()?, name, expected, value)
+}
+
+fn save_if_unchanged_to(
+    path: &Path,
+    name: &str,
+    expected: &str,
+    value: Option<&str>,
+) -> Result<bool> {
+    let current = load_from(path, name)?.map(zeroize::Zeroizing::new);
+    if current.as_ref().map(|secret| secret.as_str()) != Some(expected) {
+        return Ok(false);
+    }
+    save_many_to(path, &[(name.to_owned(), value.map(str::to_owned))])?;
+    Ok(true)
+}
+
 /// Applies several secret changes through one protected-file replacement.
 /// Validation and DPAPI encryption happen before the existing file changes,
 /// so account-level edits cannot leave only part of their keys updated.
@@ -391,6 +411,51 @@ fn unprotect(_data: &[u8]) -> Result<Vec<u8>> {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn credential_rotation_preserves_manual_replacement_and_removal() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("provider-secrets.json");
+        save_many_to(
+            &path,
+            &[("muse.session.test".into(), Some("test-original".into()))],
+        )?;
+        assert!(save_if_unchanged_to(
+            &path,
+            "muse.session.test",
+            "test-original",
+            Some("test-rotated")
+        )?);
+        assert_eq!(
+            load_from(&path, "muse.session.test")?.as_deref(),
+            Some("test-rotated")
+        );
+
+        save_many_to(
+            &path,
+            &[("muse.session.test".into(), Some("test-manual".into()))],
+        )?;
+        assert!(!save_if_unchanged_to(
+            &path,
+            "muse.session.test",
+            "test-rotated",
+            Some("test-stale")
+        )?);
+        assert_eq!(
+            load_from(&path, "muse.session.test")?.as_deref(),
+            Some("test-manual")
+        );
+
+        save_many_to(&path, &[("muse.session.test".into(), None)])?;
+        assert!(!save_if_unchanged_to(
+            &path,
+            "muse.session.test",
+            "test-manual",
+            Some("test-stale")
+        )?);
+        assert!(!path.exists());
+        Ok(())
+    }
 
     #[test]
     fn rollback_does_not_overwrite_a_newer_secret_update() -> Result<()> {

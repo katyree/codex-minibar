@@ -9,7 +9,9 @@ use crate::{
 };
 use anyhow::{Result, bail, ensure};
 use chrono::{DateTime, Utc};
+use cookie::Cookie;
 use regex::Regex;
+use serde::Deserialize;
 use serde_json::Value;
 use std::{
     collections::HashSet,
@@ -20,6 +22,7 @@ use std::{
 use zeroize::Zeroizing;
 
 const ORIGIN: &str = "https://muse.ai";
+const AUTH_CHECK: &str = "/api/auth/check";
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36";
 const RESPONSE_LIMIT: usize = 8 * 1024 * 1024;
 const DISCOVERY_ERROR: &str =
@@ -45,8 +48,10 @@ impl MuseClient {
         }
     }
 
-    fn fetch(&mut self, cookie: &str) -> Result<RateLimits> {
+    fn fetch(&mut self, cookie: &mut Zeroizing<String>) -> Result<RateLimits> {
         let deadline = Instant::now() + Duration::from_secs(30);
+        let (status, body) = request(AUTH_CHECK, Some(cookie), None, deadline)?;
+        validate_session_response(status, &body)?;
         if let Some(action) = self.action_id.clone() {
             let (status, body) = request("/", Some(cookie), Some(&action), deadline)?;
             if !stale_action(status, &body) {
@@ -115,9 +120,27 @@ pub(crate) fn normalize_cookie(raw: &str) -> Result<Zeroizing<String>> {
     Ok(Zeroizing::new(value.into()))
 }
 
-pub(crate) fn verify_session(raw: &str) -> Result<()> {
-    let cookie = normalize_cookie(raw)?;
-    MuseClient::new("check").fetch(&cookie).map(|_| ())
+pub(crate) fn verify_session(raw: &str) -> Result<Zeroizing<String>> {
+    let mut cookie = normalize_cookie(raw)?;
+    MuseClient::new("check").fetch(&mut cookie)?;
+    Ok(cookie)
+}
+
+fn validate_session_response(status: u16, body: &str) -> Result<()> {
+    #[derive(Deserialize)]
+    struct SessionCheck {
+        ok: bool,
+    }
+    ensure!(
+        status == 200,
+        "Muse could not validate the session. Refresh to retry."
+    );
+    // Ignore the access token: quota requests use the cookie, and the token
+    // must never enter settings, errors, or logs.
+    let check: SessionCheck = serde_json::from_str(body)
+        .map_err(|_| anyhow::anyhow!("Muse returned an unrecognized session response."))?;
+    ensure!(check.ok, SESSION_ERROR);
+    Ok(())
 }
 
 fn stale_action(status: u16, body: &str) -> bool {
@@ -129,12 +152,13 @@ fn stale_action(status: u16, body: &str) -> bool {
 
 fn request(
     path: &str,
-    cookie: Option<&str>,
+    mut cookie: Option<&mut Zeroizing<String>>,
     action: Option<&str>,
     deadline: Instant,
-) -> Result<(u16, String)> {
+) -> Result<(u16, Zeroizing<String>)> {
     ensure!(
         path == "/"
+            || path == AUTH_CHECK
             || (path.starts_with("/_next/static/chunks/")
                 && path.ends_with(".js")
                 && !path.contains("..")
@@ -142,7 +166,7 @@ fn request(
         DISCOVERY_ERROR
     );
     ensure!(
-        cookie.is_none() || path == "/",
+        cookie.is_none() || path == "/" || path == AUTH_CHECK,
         "Muse credentials may only be sent to muse.ai."
     );
     let timeout = deadline
@@ -154,11 +178,15 @@ fn request(
         .build();
     let mut req = agent
         .request(
-            if action.is_some() { "POST" } else { "GET" },
+            if action.is_some() || path == AUTH_CHECK {
+                "POST"
+            } else {
+                "GET"
+            },
             &format!("{ORIGIN}{path}"),
         )
         .set("User-Agent", USER_AGENT);
-    if let Some(cookie) = cookie {
+    if let Some(cookie) = cookie.as_ref() {
         req = req.set("Cookie", cookie);
     }
     let response = if let Some(action) = action {
@@ -170,6 +198,11 @@ fn request(
             .set("Sec-Fetch-Dest", "empty")
             .set("Content-Type", "text/plain;charset=UTF-8")
             .send_string(r#"[{"includeAgreement":false}]"#)
+    } else if path == AUTH_CHECK {
+        req.set("Accept", "application/json")
+            .set("Origin", ORIGIN)
+            .set("Cache-Control", "no-store")
+            .send_string("")
     } else {
         req.set("Accept", if path == "/" { "text/html" } else { "*/*" })
             .call()
@@ -178,6 +211,9 @@ fn request(
         Ok(response) | Err(ureq::Error::Status(_, response)) => response,
         Err(_) => bail!("Muse usage request could not connect or timed out."),
     };
+    if let Some(cookie) = cookie.as_mut() {
+        merge_response_cookies(cookie, &response, path);
+    }
     let status = response.status();
     if matches!(status, 401 | 403) || matches!(status, 300..=399) {
         bail!(SESSION_ERROR);
@@ -199,7 +235,64 @@ fn request(
     );
     let body = String::from_utf8(bytes)
         .map_err(|_| anyhow::anyhow!("Muse returned an unrecognized response."))?;
-    Ok((status, body))
+    Ok((status, Zeroizing::new(body)))
+}
+
+fn merge_response_cookies(cookie: &mut Zeroizing<String>, response: &ureq::Response, path: &str) {
+    for header in response.all("set-cookie") {
+        let Ok(replacement) = Cookie::parse(header) else {
+            continue;
+        };
+        // A pasted root-page Cookie header has no scope metadata. Only keep
+        // cookies valid at both quota (/) and session-check endpoints.
+        if replacement
+            .domain()
+            .is_some_and(|domain| !domain.eq_ignore_ascii_case("muse.ai"))
+            || replacement
+                .path()
+                .unwrap_or(if path == "/" { "/" } else { "/api/auth" })
+                != "/"
+            || (replacement.name().starts_with("__Secure-") && replacement.secure() != Some(true))
+            || (replacement.name().starts_with("__Host-")
+                && (replacement.secure() != Some(true)
+                    || replacement.domain().is_some()
+                    || replacement.path() != Some("/")))
+        {
+            continue;
+        }
+        let pair = Zeroizing::new(format!("{}={}", replacement.name(), replacement.value()));
+        if normalize_cookie(&pair).is_err() {
+            continue;
+        }
+        let expired = replacement.max_age().map_or_else(
+            || {
+                replacement
+                    .expires_datetime()
+                    .is_some_and(|expires| expires.unix_timestamp() <= Utc::now().timestamp())
+            },
+            |age| age.whole_seconds() <= 0,
+        );
+        let mut updated = Zeroizing::new(
+            cookie
+                .split(';')
+                .map(str::trim)
+                .filter(|pair| {
+                    pair.split_once('=')
+                        .is_some_and(|(name, _)| name != replacement.name())
+                })
+                .collect::<Vec<_>>()
+                .join("; "),
+        );
+        if !expired {
+            if !updated.is_empty() {
+                updated.push_str("; ");
+            }
+            updated.push_str(&pair);
+        }
+        if updated.len() <= 64 * 1024 {
+            *cookie = updated;
+        }
+    }
 }
 
 fn chunk_paths(text: &str) -> Vec<String> {
@@ -230,7 +323,7 @@ fn settings_paths(text: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn discover(cookie: &str, deadline: Instant) -> Result<String> {
+fn discover(cookie: &mut Zeroizing<String>, deadline: Instant) -> Result<String> {
     let (status, page) = request("/", Some(cookie), None, deadline)?;
     ensure!(status == 200, DISCOVERY_ERROR);
     let mut text = String::new();
@@ -308,8 +401,20 @@ fn parse_response(status: u16, body: &str) -> Result<RateLimits> {
 impl LimitProvider for MuseClient {
     fn read_limits(&mut self) -> Result<RateLimits> {
         let raw = Zeroizing::new(secrets::load(&secret_name(&self.instance_id))?.ok_or_else(|| anyhow::anyhow!("Connect Muse in Settings → Providers → Muse using your Chrome session credential."))?);
-        let cookie = normalize_cookie(&raw)?;
-        self.fetch(&cookie)
+        let mut cookie = normalize_cookie(&raw)?;
+        let original = cookie.clone();
+        let result = self.fetch(&mut cookie);
+        // A response may rotate credentials before a later quota request fails.
+        // Persist that rotation even on failure, unless Settings replaced or
+        // removed this credential while the network request was in flight.
+        if cookie.as_str() != original.as_str() {
+            secrets::save_if_unchanged(
+                &secret_name(&self.instance_id),
+                &raw,
+                (!cookie.is_empty()).then_some(cookie.as_str()),
+            )?;
+        }
+        result
     }
 }
 impl UsageProvider for MuseClient {
@@ -330,6 +435,77 @@ impl Activator for MuseActivator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn keeps_rotated_cookies_for_following_requests_and_rejects_other_scopes() {
+        let mut cookie =
+            normalize_cookie("hatch_sess=test-original; test_other=preserved").unwrap();
+        let response: ureq::Response = concat!(
+            "HTTP/1.1 200 OK\r\n",
+            "Set-Cookie: hatch_sess=test-rotated; Domain=.muse.ai; Path=/; Secure; HttpOnly\r\n",
+            "Set-Cookie: __Host-test_device=test-device; Path=/; Secure; HttpOnly\r\n",
+            "Set-Cookie: hatch_sess=test-wrong-domain; Domain=example.com; Path=/\r\n",
+            "Set-Cookie: hatch_sess=test-wrong-path; Path=/private\r\n",
+            "Set-Cookie: hatch_sess=test-default-auth-path\r\n",
+            "Set-Cookie: __Host-test_device=test-insecure; Path=/\r\n",
+            "Set-Cookie: invalid\r\n\r\n",
+        )
+        .parse()
+        .unwrap();
+        merge_response_cookies(&mut cookie, &response, AUTH_CHECK);
+        assert_eq!(
+            cookie.as_str(),
+            "test_other=preserved; hatch_sess=test-rotated; __Host-test_device=test-device"
+        );
+
+        let response: ureq::Response =
+            "HTTP/1.1 200 OK\r\nSet-Cookie: hatch_sess=test-next; Path=/\r\n\r\n"
+                .parse()
+                .unwrap();
+        merge_response_cookies(&mut cookie, &response, "/");
+        assert_eq!(
+            cookie.as_str(),
+            "test_other=preserved; __Host-test_device=test-device; hatch_sess=test-next"
+        );
+    }
+
+    #[test]
+    fn honors_cookie_deletion_and_max_age_precedence() {
+        let mut cookie =
+            normalize_cookie("hatch_sess=test-original; test_expired=old; test_keep=old").unwrap();
+        let response: ureq::Response = concat!(
+            "HTTP/1.1 401 Unauthorized\r\n",
+            "Set-Cookie: hatch_sess=; Path=/; Max-Age=0\r\n",
+            "Set-Cookie: test_expired=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT\r\n",
+            "Set-Cookie: test_keep=new; Path=/; Max-Age=3600; Expires=Thu, 01 Jan 1970 00:00:00 GMT\r\n\r\n",
+        ).parse().unwrap();
+        merge_response_cookies(&mut cookie, &response, AUTH_CHECK);
+        assert_eq!(cookie.as_str(), "test_keep=new");
+    }
+
+    #[test]
+    fn validates_session_without_exposing_returned_access_tokens() {
+        assert!(
+            validate_session_response(
+                200,
+                r#"{"ok":true,"access_token":"test-token","outcome":"validated"}"#
+            )
+            .is_ok()
+        );
+        for (status, body) in [
+            (200, r#"{"ok":false,"access_token":"test-token"}"#),
+            (200, "test-token"),
+            (503, "test-token"),
+        ] {
+            assert!(
+                !validate_session_response(status, body)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("test-token")
+            );
+        }
+    }
+
     #[test]
     fn reads_weekly_percent_plan_and_unix_second_reset() {
         let quota = parse_response(200, "0:{\"a\":\"$@1\"}\n1:{\"success\":true,\"subscription\":{\"tier\":{\"name\":\"Muse Free\"},\"usage\":{\"percentUsed\":2,\"resetsAt\":1792281600},\"topupBalance\":1000000}}\n").unwrap();

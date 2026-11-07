@@ -47,6 +47,7 @@ smallvec = "1"
 unicode-segmentation = "1"
 fluent-bundle = "0.16"
 unic-langid = "0.9"
+cookie = { version = "0.18", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows-numerics = { git = "https://github.com/microsoft/windows-rs", rev = "07f344c019b8fdae4d398d4c2591596044cb416a" }
