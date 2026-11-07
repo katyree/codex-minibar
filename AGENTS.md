@@ -97,6 +97,10 @@ This opt-in test contacts Muse and can persist renewed cookies. It does not laun
 
 ## Linux
 
+This fork's CI and releases target Windows only (x86, x64, ARM64), plus the
+Stream Deck plugin. Linux source and manual build scripts remain available;
+do not re-enable Linux CI or release packages without a user request.
+
 The app also targets Linux (X11 and Wayland). `cfg(not(windows))` code is the Linux
 build; desktop integration lives in `src/linux/` (StatusNotifierItem tray via `ksni`,
 freedesktop notifications, XDG portal settings, Secret Service key for secrets,
@@ -105,7 +109,7 @@ XDG autostart, single-instance socket with `--toggle`). On Linux run plain Cargo
 `cargo clippy --all-targets --all-features --locked -- -D warnings`); package with
 `./build-linux.sh`.
 
-Every change must keep both platforms compiling and Clippy-clean. From Linux, check
+Preserve existing Linux code when making Windows changes. From Linux, check
 Windows with `CARGO_TARGET_DIR=target/win-check cargo clippy --target
 x86_64-pc-windows-gnu --all-targets --all-features -- -D warnings` (needs the
 `x86_64-pc-windows-gnu` Rust target and mingw-w64).
