@@ -131,7 +131,7 @@ build_rpm() {
     local rpm_root="$stage/rpm-root"
     # RPM reserves '-' for the release separator; '~' orders prereleases
     # before the corresponding stable version.
-    local rpm_version="${version/-/~}"
+    local rpm_version="${version/-/\~}"
     install_tree "$rpm_root/usr"
     mkdir -p "$topdir"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
     # Libraries the binary links are found by rpm's automatic dependencies.
