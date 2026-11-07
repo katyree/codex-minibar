@@ -20,10 +20,20 @@ use codex_minibar::{
 };
 
 fn run() -> Result<()> {
+    codex_minibar::banked_reset::mark_process_start();
     notifications::initialize();
     sync_installed_display_version();
     let path = Settings::default_path()?;
+    if codex_minibar::fake::enabled() {
+        codex_minibar::fake::seed_settings()?;
+    }
     codex_minibar::logger::initialize(&path)?;
+    #[cfg(not(windows))]
+    if let Err(error) =
+        futures::executor::block_on(codex_minibar::linux::identity::register_portal())
+    {
+        codex_minibar::logger::info(format!("Linux desktop portal identity: {error:#}"));
+    }
     if let Err(error) = codex_minibar::pricing::initialize() {
         eprintln!("failed to hydrate pricing catalog: {error:#}");
     }
@@ -47,6 +57,10 @@ fn run() -> Result<()> {
             codex_minibar::logger::info(format!(
                 "Codex CLI startup cache cleanup deferred: {error:#}"
             ));
+        }
+        #[cfg(not(windows))]
+        if let Err(error) = codex_minibar::linux::keybinding::refresh_extracted_appimage_command() {
+            codex_minibar::logger::info(format!("popup shortcut command refresh: {error:#}"));
         }
     });
     let activation_path = path.with_file_name("activation.toml");
@@ -128,9 +142,12 @@ fn run() -> Result<()> {
     codex_minibar::theme::apply_appearance(state.settings.theme, state.settings.accent_color);
     codex_minibar::popup_window::start(Arc::clone(&state));
     codex_minibar::whats_new::start(&state.settings, just_updated);
+    #[cfg(windows)]
     if onboarding_needed {
         codex_minibar::settings_window::open_onboarding();
     }
+    #[cfg(not(windows))]
+    codex_minibar::linux::instance::show_initial_window(onboarding_needed);
     // The GPUI thread owns every window and the bridge thread owns the tray;
     // both exit the process directly, so the main thread only stays alive.
     loop {
@@ -169,6 +186,14 @@ fn show_error(message: &str) {
 }
 
 fn main() {
+    #[cfg(not(windows))]
+    // SAFETY: this is the first statement of main, before any thread exists.
+    unsafe {
+        codex_minibar::linux::appimage_launch::restore_user_tmpdir();
+    }
+    if codex_minibar::status::is_cli_request() {
+        std::process::exit(codex_minibar::status::run_cli());
+    }
     if troubleshoot::is_cli_request() {
         if let Err(error) = troubleshoot::launch_cli_picker() {
             show_error(&format!(
@@ -178,6 +203,13 @@ fn main() {
         return;
     }
 
+    #[cfg(not(windows))]
+    // SAFETY: only argument checks have run on this path. Capture before
+    // single-instance activation or any other app code can start threads.
+    // The terminal-only CLI path above forwards its launch context directly.
+    unsafe {
+        codex_minibar::linux::instance::capture_startup_activation_token();
+    }
     let instance = match SingleInstance::acquire_or_activate_existing() {
         Ok(Some(instance)) => instance,
         Ok(None) => return,

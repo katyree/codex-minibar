@@ -50,6 +50,19 @@ impl SettingsWindow {
                 ),
                 kit::toggle_row(
                     k,
+                    "notif-auto-reset-upcoming",
+                    crate::i18n::tr("before-an-automatic-reset"),
+                    Some(
+                        crate::i18n::tr("warns-before-a-banked-reset-is-applied-automatically")
+                            .into(),
+                    ),
+                    n.auto_reset_upcoming,
+                    Self::h(cx, |this, value: bool, _, cx| {
+                        this.edit(cx, move |s| s.notifications.auto_reset_upcoming = value)
+                    }),
+                ),
+                kit::toggle_row(
+                    k,
                     "notif-game-mode-changes",
                     crate::i18n::tr("notify-game-mode-changes"),
                     Some(crate::i18n::tr("notify-game-mode-changes-description").into()),
@@ -104,7 +117,7 @@ impl SettingsWindow {
             ]
         });
         let delivery = kit::card_of(k, |k| {
-            vec![
+            let mut rows = vec![
                 kit::toggle_row(
                     k,
                     "notif-sound",
@@ -125,7 +138,13 @@ impl SettingsWindow {
                         this.edit(cx, move |s| s.notifications.follow_do_not_disturb = value)
                     }),
                 ),
-            ]
+            ];
+            // Linux posts to the desktop's notification server, which applies
+            // its own Do Not Disturb to every bubble.
+            if !cfg!(windows) {
+                rows.pop();
+            }
+            rows
         });
         let low = self.threshold_card(
             k,

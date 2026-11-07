@@ -1,4 +1,4 @@
-//! Command Code (`cmdc`) rolling and monthly credit limits from the official
+//! Command Code rolling and monthly credit limits from the official
 //! CLI login.
 //!
 //! `cmd login` stores a `user_...` API key in `~/.commandcode/auth.json`. The
@@ -41,6 +41,7 @@ const WEEKLY_MINUTES: u32 = 7 * 24 * 60;
 const MONTHLY_MINUTES: u32 = 30 * 24 * 60;
 /// `cmd` itself is deliberately absent: on Windows it would resolve to
 /// `cmd.exe`. The npm package installs these aliases next to it.
+#[cfg(windows)]
 const CLI_NAMES: &[&str] = &[
     "cmdc.cmd",
     "cmdc.ps1",
@@ -50,6 +51,8 @@ const CLI_NAMES: &[&str] = &[
     "commandcode.cmd",
     "commandcode.ps1",
 ];
+#[cfg(not(windows))]
+const CLI_NAMES: &[&str] = &["command-code", "cmd", "cmdc", "commandcode"];
 pub(crate) const MONTHLY_LIMIT_ID: &str = "monthly";
 const LOCAL_HISTORY_DAYS: i64 = 365;
 const HOURLY_HISTORY_HOURS: i64 = 48;
@@ -96,7 +99,7 @@ impl CommandCodeClient {
         {
             Ok(response) => response,
             Err(ureq::Error::Status(401 | 403, _)) => {
-                bail!("Command Code API key was rejected; run `cmdc login`")
+                bail!("Command Code API key was rejected; run `command-code login`")
             }
             Err(ureq::Error::Status(429, _)) => {
                 return Err(crate::worker::rate_limit_error(
@@ -191,12 +194,18 @@ pub fn cli_available(explicit: Option<&Path>) -> Option<PathBuf> {
         .next()
 }
 
+#[cfg(windows)]
 fn npm_launchers() -> Vec<PathBuf> {
     let Some(appdata) = std::env::var_os("APPDATA") else {
         return Vec::new();
     };
     let npm = PathBuf::from(appdata).join("npm");
     CLI_NAMES.iter().map(|name| npm.join(name)).collect()
+}
+
+#[cfg(not(windows))]
+fn npm_launchers() -> Vec<PathBuf> {
+    Vec::new() // Unix npm launchers are discovered on PATH.
 }
 
 fn auth_path() -> Option<PathBuf> {
@@ -218,7 +227,7 @@ fn load_auth() -> Result<CommandCodeAuth> {
     let path = auth_path().context("Command Code home directory is unavailable")?;
     let raw = fs::read_to_string(&path).with_context(|| {
         format!(
-            "Command Code auth not found at {}; run `cmdc login`",
+            "Command Code auth not found at {}; run `command-code login`",
             path.display()
         )
     })?;
@@ -232,7 +241,7 @@ fn parse_auth(raw: &str) -> Result<CommandCodeAuth> {
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|key| !key.is_empty())
-        .context("Command Code auth.json has no API key; run `cmdc login`")?
+        .context("Command Code auth.json has no API key; run `command-code login`")?
         .to_owned();
     Ok(CommandCodeAuth {
         api_key,
@@ -787,12 +796,36 @@ mod tests {
         assert!(timestamp(Some(&Value::from("2026-11-16T16:09:56Z"))).is_some());
     }
 
+    #[cfg(not(windows))]
+    #[test]
+    fn resolves_unix_command_code_names_from_an_explicit_folder() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().unwrap();
+        for name in ["command-code", "cmd"] {
+            let launcher = directory.path().join(name);
+            fs::write(&launcher, b"fixture").unwrap();
+            fs::set_permissions(&launcher, fs::Permissions::from_mode(0o755)).unwrap();
+            assert_eq!(
+                cli_available(Some(directory.path())),
+                Some(launcher.canonicalize().unwrap())
+            );
+            fs::remove_file(launcher).unwrap();
+        }
+        assert!(!CLI_NAMES.contains(&"cmd.exe"));
+    }
+
+    #[cfg(windows)]
     #[test]
     fn never_resolves_the_windows_cmd_shell() {
         assert!(!CLI_NAMES.iter().any(|name| name.starts_with("cmd.")));
         let directory = tempfile::tempdir().unwrap();
         let launcher = directory.path().join("cmdc.cmd");
         fs::write(&launcher, b"fixture").unwrap();
+        #[cfg(not(windows))]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&launcher, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
         assert_eq!(
             cli_available(Some(directory.path())),
             Some(fs::canonicalize(launcher).unwrap())
@@ -909,5 +942,32 @@ mod tests {
         assert_eq!(unpriced.model, "unknown");
         assert_eq!(unpriced.usage.cached_input_tokens, 5);
         assert_eq!(unpriced.usage.priced_requests, 0);
+    }
+
+    #[test]
+    fn transcript_null_metadata_and_partial_cache_usage_keep_real_tokens() {
+        let record = usage_record(&serde_json::json!({
+            "id": null, "model": null, "type": "future-response",
+            "timestamp": "2026-11-01T01:30:00-04:00",
+            "usage": {"inputTokens": 10, "outputTokens": null,
+                      "cacheReadTokens": 99, "costUsd": null, "futureTokens": 500}
+        }))
+        .unwrap();
+        assert_eq!(
+            record.timestamp,
+            "2026-11-01T05:30:00Z".parse::<DateTime<Utc>>().unwrap()
+        );
+        assert_eq!(record.model, "unknown");
+        assert_eq!(record.id, None);
+        assert_eq!(record.usage.input_tokens, 10);
+        assert_eq!(record.usage.cached_input_tokens, 10);
+        assert_eq!(record.usage.output_tokens, 0);
+        assert_eq!(record.usage.priced_requests, 0);
+        assert!(
+            usage_record(&serde_json::json!({
+                "timestamp": "invalid", "usage": {"inputTokens": 10}
+            }))
+            .is_none()
+        );
     }
 }

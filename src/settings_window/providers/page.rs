@@ -512,7 +512,12 @@ impl SettingsWindow {
                             "signed-in-as-identity",
                             &[("identity", identity.to_string())],
                         ),
-                        (Some(_), None) => crate::i18n::tr("saved-in-windows-user-storage").into(),
+                        (Some(_), None) => (if cfg!(windows) {
+                            crate::i18n::tr("saved-in-windows-user-storage")
+                        } else {
+                            crate::i18n::tr("linux-saved-in-windows-user-storage")
+                        })
+                        .into(),
                         (None, _) => {
                             crate::i18n::tr("paste-a-sessionkey-or-an-oauth-access-token").into()
                         }
@@ -1043,6 +1048,20 @@ impl SettingsWindow {
                 }),
             ));
         }
+        // Only these drivers can redeem a banked reset.
+        if matches!(instance.driver, ProviderKind::Codex | ProviderKind::Claude) {
+            rows.push(kit::toggle_row_with(
+                k,
+                format!("provider-{}-auto-reset", provider.id()),
+                crate::i18n::tr("automatic-resets"),
+                Some(crate::i18n::tr("spends-a-banked-reset-shortly-before-it-expires").into()),
+                instance.auto_reset,
+                Capabilities::reason(instance, Capability::AutoReset).map(SharedString::from),
+                Self::h(cx, move |this, value: bool, _, cx| {
+                    this.edit_instance(cx, provider, move |instance| instance.auto_reset = value)
+                }),
+            ));
+        }
         rows.push(kit::toggle_row_with(
             k,
             format!("provider-{}-usage", provider.id()),
@@ -1120,7 +1139,14 @@ impl SettingsWindow {
             .icon(kit::row_icon(k, "key-fill"));
         let row = match saved_key {
             Some(key) => row
-                .description(k, crate::i18n::tr("saved-in-windows-user-storage"))
+                .description(
+                    k,
+                    if cfg!(windows) {
+                        crate::i18n::tr("saved-in-windows-user-storage")
+                    } else {
+                        crate::i18n::tr("linux-saved-in-windows-user-storage")
+                    },
+                )
                 .trailing(masked(k, crate::secrets::masked_hint(&key)))
                 .trailing(kit::more_menu(
                     k,

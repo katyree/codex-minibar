@@ -37,11 +37,14 @@ impl LoginControl {
     pub(crate) fn cancelled(&self) -> bool {
         self.0.load(Ordering::SeqCst) == 1
     }
+    /// Safe to call again: `login` commits and its caller then saves the result.
     pub(crate) fn begin_save(&self) -> Result<()> {
         ensure!(
-            self.0
-                .compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst)
-                .is_ok(),
+            !matches!(
+                self.0
+                    .compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst),
+                Err(1)
+            ),
             "Sign-in cancelled."
         );
         Ok(())
@@ -82,13 +85,13 @@ fn login_command(executable: &Path, directory: &Path) -> Command {
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     super::scope_command(&mut command, Some(directory));
+    crate::provider_cli::disable_auto_update(&mut command);
     command
 }
 
 fn read_login(directory: &Path) -> Result<()> {
-    let bytes = std::fs::read(directory.join(".credentials.json")).context(
-        "Claude Code did not save a login. Install native Windows Claude Code and try again.",
-    )?;
+    let bytes = std::fs::read(directory.join(".credentials.json"))
+        .context("Claude Code did not save a login. Install the Claude Code CLI and try again.")?;
     let file: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|_| anyhow::anyhow!("Claude Code saved an unreadable login."))?;
     let session: Session = serde_json::from_value(file["claudeAiOauth"].clone()).map_err(|_| {
@@ -158,11 +161,17 @@ pub(crate) fn login(explicit: Option<&Path>, folder: &Path, control: &LoginContr
     ensure!(!control.cancelled(), "Claude sign-in cancelled.");
     // Never the desktop app's bundled copy: it serves only the app's account.
     let executable = super::cli_available(explicit).context(super::OTHER_ACCOUNT_NEEDS_CLI)?;
+    #[cfg(windows)]
     ensure!(
         executable
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("exe")),
         "Sign-in requires native Windows Claude Code. Install its native executable, or switch Source to Manual."
+    );
+    #[cfg(not(windows))]
+    ensure!(
+        crate::linux::apps::is_executable(&executable),
+        "Claude Code CLI is not executable. Check its file permissions and try again."
     );
     std::fs::create_dir_all(folder).with_context(|| format!("create {}", folder.display()))?;
     ensure!(
@@ -173,10 +182,7 @@ pub(crate) fn login(explicit: Option<&Path>, folder: &Path, control: &LoginContr
     #[cfg(windows)]
     let mut child = login_child::LoginChild::spawn(&command)?;
     #[cfg(not(windows))]
-    let mut child = {
-        let mut command = command;
-        command.spawn()?
-    };
+    let mut child = crate::linux::login_child::LoginChild::spawn_login(command)?;
     let started = Instant::now();
     loop {
         if control.cancelled() || started.elapsed() >= Duration::from_secs(300) {
@@ -211,6 +217,22 @@ pub(crate) fn login(explicit: Option<&Path>, folder: &Path, control: &LoginContr
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(windows))]
+    #[test]
+    fn linux_login_runs_a_unix_launcher_in_the_isolated_account_folder() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let cli = root.path().join("claude");
+        std::fs::write(&cli, r#"#!/bin/sh
+printf '%s' '{"claudeAiOauth":{"accessToken":"sk-ant-oat-fixture","refreshToken":"fixture-refresh","scopes":["user:profile"]}}' > "$CLAUDE_CONFIG_DIR/.credentials.json"
+"#).unwrap();
+        std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let folder = root.path().join("account");
+        login(Some(&cli), &folder, &LoginControl::default()).unwrap();
+        assert!(read_login(&folder).is_ok());
+        assert!(!root.path().join(".credentials.json").exists());
+    }
 
     #[test]
     fn abandoned_login_cleanup_keeps_other_directories_and_files() {
@@ -283,5 +305,7 @@ mod tests {
         control.begin_save().unwrap();
         control.cancel();
         assert!(!control.cancelled());
+        // `login` commits, then the Settings dialog commits before saving.
+        control.begin_save().unwrap();
     }
 }

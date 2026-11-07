@@ -711,13 +711,31 @@ fn folder_configs(driver: ProviderKind) -> Vec<FolderConfig> {
         )],
         ProviderKind::Antigravity => vec![binary(
             crate::i18n::tr("agy-cli-folder"),
-            crate::i18n::tr("folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut"),
-            r"C:\Users\you\AppData\Local\agy\bin",
+            if cfg!(windows) {
+                crate::i18n::tr("folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut")
+            } else {
+                crate::i18n::tr(
+                    "linux-folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut",
+                )
+            },
+            if cfg!(windows) {
+                r"C:\Users\you\AppData\Local\agy\bin"
+            } else {
+                "~/.local/bin"
+            },
         )],
         ProviderKind::Grok => vec![binary(
             crate::i18n::tr("grok-cli-folder"),
-            crate::i18n::tr("folder-with-grok-exe-grok-cmd-or-grok-ps1-leave-empty-to-find-it"),
-            r"C:\Users\you\.grok\bin",
+            crate::i18n::tr(if cfg!(windows) {
+                "folder-with-grok-exe-grok-cmd-or-grok-ps1-leave-empty-to-find-it"
+            } else {
+                "linux-folder-with-grok-cli"
+            }),
+            if cfg!(windows) {
+                r"C:\Users\you\.grok\bin"
+            } else {
+                "~/.grok/bin"
+            },
         )],
         ProviderKind::Junie => vec![binary(
             crate::i18n::tr("junie-source-path"),
@@ -726,8 +744,16 @@ fn folder_configs(driver: ProviderKind) -> Vec<FolderConfig> {
         )],
         ProviderKind::CommandCode => vec![binary(
             crate::i18n::tr("command-code-cli-folder"),
-            crate::i18n::tr("folder-with-cmdc-cmd-or-cmdc-ps1-leave-empty-to-find-it-automati"),
-            r"C:\Users\you\AppData\Roaming\npm",
+            crate::i18n::tr(if cfg!(windows) {
+                "folder-with-cmdc-cmd-or-cmdc-ps1-leave-empty-to-find-it-automati"
+            } else {
+                "linux-folder-with-command-code-cli"
+            }),
+            if cfg!(windows) {
+                r"C:\Users\you\AppData\Roaming\npm"
+            } else {
+                "~/.local/bin"
+            },
         )],
         ProviderKind::Kiro => vec![
             binary(
@@ -775,9 +801,11 @@ fn provider_description(provider: ProviderKind) -> &'static str {
         ProviderKind::OpenRouter => {
             crate::i18n::tr("reads-api-key-usage-and-spend-limits-a-management-key-also-enable")
         }
-        ProviderKind::Antigravity => {
-            crate::i18n::tr("reads-subscription-quota-from-your-existing-official-agy-windows")
-        }
+        ProviderKind::Antigravity => crate::i18n::tr(if cfg!(windows) {
+            "reads-subscription-quota-from-your-existing-official-agy-windows"
+        } else {
+            "linux-reads-subscription-quota-from-your-existing-official-agy-windows"
+        }),
         ProviderKind::Grok => {
             crate::i18n::tr("reads-supergrok-subscription-credits-from-your-existing-official")
         }

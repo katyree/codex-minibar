@@ -2960,14 +2960,138 @@ time-late = { $time } verspätet
 
 # Floating usage panel
 popup-floating = Schwebendes Fenster
+linux-popup-keep-open = Offen halten
+linux-popup-keep-open-description = Das Panel beim Wechseln zwischen Apps offen halten. Unter Wayland mit der rechten Maustaste auf die Kopfzeile klicken und im Fenstermenü des Desktops „Immer im Vordergrund“ wählen, falls verfügbar.
+linux-popup-unpin = Panel lösen
 popup-floating-description = Das Fenster bleibt offen. Ziehen Sie es an der Kopfzeile an eine andere Position oder auf einen anderen Monitor.
 popup-always-on-top = Immer im Vordergrund
 popup-always-on-top-description = Das Fenster über anderen Anwendungen anzeigen und beim App-Wechsel offen halten.
 popup-position = Fensterposition
 popup-position-description = Die Position wird zwischen Sitzungen gespeichert.
 popup-reset-position = Position zurücksetzen
+popup-placement = Position des Fensters
+popup-placement-description = Wo das Fenster auf dem Bildschirm geöffnet wird. Automatisch öffnet es neben dem Infobereich oder der Taskleiste.
+popup-placement-auto = Automatisch
+popup-placement-top-left = Oben links
+popup-placement-top-center = Oben Mitte
+popup-placement-top-right = Oben rechts
+popup-placement-bottom-left = Unten links
+popup-placement-bottom-center = Unten Mitte
+popup-placement-bottom-right = Unten rechts
+linux-popup-placement-description = Wo das Fenster auf dem Bildschirm geöffnet wird.
+linux-popup-placement-wayland = Unter Wayland bestimmt der Desktop, wo Fenster geöffnet werden. Diese Einstellung gilt daher nur in X11-Sitzungen.
 popup-drag-header = Zum Verschieben ziehen
 popup-close = Fenster schließen
 
 show-popup-action-bar = Aktionsleiste im Popup anzeigen
 show-popup-action-bar-description = App-Titel und Aktionen im normalen Popup anzeigen. Schwebende Fenster zeigen diese Leiste immer.
+
+# src/settings_window/activation.rs
+use-banked-resets-automatically = Gespeicherte Resets automatisch nutzen
+
+# src/settings_window/activation.rs
+spends-a-banked-reset-shortly-before-it-expires = Wendet einen gespeicherten Reset kurz vor seinem Ablauf an, damit er nicht verfällt. Wird übersprungen, solange die Limits nichts zurückzusetzen haben.
+
+# src/settings_window/activation.rs
+use-before-expiry = Vor Ablauf anwenden
+
+# src/settings_window/activation.rs
+how-long-before-a-banked-reset-expires-it-is-applied = Wie lange vor Ablauf ein gespeicherter Reset angewendet wird.
+
+# src/settings_window/providers/page.rs
+automatic-resets = Automatische Resets
+
+# src/popup_window/auto_reset.rs
+banked-reset-applied-automatically = Gespeicherter Reset automatisch angewendet
+
+# src/instances.rs
+this-provider-has-no-banked-resets = Dieser Anbieter hat keine gespeicherten Resets.
+
+# src/popup_window/auto_reset.rs
+banked-reset-applies-in-minutes = Gespeicherter Reset wird in { $minutes } Min. angewendet
+
+# src/settings_window/notifications.rs
+before-an-automatic-reset = Vor einem automatischen Reset
+
+# src/settings_window/notifications.rs
+warns-before-a-banked-reset-is-applied-automatically = Warnt 10 Minuten, bevor ein gespeicherter Reset automatisch angewendet wird.
+
+# src/popup_window/auto_reset.rs
+apply-reset-now = Jetzt anwenden
+
+# src/popup_window/auto_reset.rs
+skip-automatic-reset = Abbrechen
+
+# src/popup_window/auto_reset.rs
+banked-reset-applied = Gespeicherter Reset angewendet
+
+# src/tray.rs
+linux-no-tray-title = Kein Infobereich gefunden
+
+# src/tray.rs
+linux-no-tray-body = Aktivieren Sie die AppIndicator-Erweiterung, um Codex Minibar im Panel zu sehen. Starten Sie Codex Minibar erneut, um es zu öffnen.
+
+# src/settings_window/general.rs
+start-at-login = Bei der Anmeldung starten
+
+# src/settings_window/general.rs
+linux-popup-shortcut-description = Legen Sie in den Tastatureinstellungen Ihres Desktops ein eigenes Tastenkürzel an, das diesen Befehl ausführt, um das Popup ein- oder auszublenden.
+
+# src/settings_window/general.rs
+copy-command = Befehl kopieren
+
+# src/settings_window/general.rs
+command-copied = Befehl kopiert
+
+# src/settings_window/about.rs
+linux-about-tagline = Kostenloser Open-Source-Begleiter für Nutzungslimits, Resets und Ausgaben von KI-Abos – direkt im Infobereich.
+
+# src/settings_window/advanced.rs
+linux-save-every-setting-to-a-toml-file-saved-keys-stay-in-windows-user = Alle Einstellungen in einer .toml-Datei speichern. Gespeicherte Schlüssel bleiben verschlüsselt auf diesem Computer.
+
+# src/settings_window/appearance.rs
+linux-windows = System
+
+# src/settings_window/appearance.rs
+linux-windows-follows-your-system-accent = „System“ folgt der Akzentfarbe Ihres Desktops.
+
+# src/settings_window/appearance.rs
+linux-windows-default = Systemstandard
+
+# src/settings_window/appearance.rs
+linux-popup-theme-description = Ändert nur das Popup. Die Einstellungen behalten ihr eigenes Aussehen.
+
+# src/settings_window/appearance.rs
+linux-glide-transitions-in-the-popup-and-settings-windows-own-animation = Gleitende Übergänge im Popup und in den Einstellungen. Die Animationseinstellung Ihres Desktops wird ebenfalls beachtet.
+
+# src/settings_window/providers/dialog.rs
+linux-saved-in-windows-user-storage-never-in-the-settings-file = Mit einem Schlüssel aus Ihrem Systemschlüsselbund verschlüsselt, nie in der Einstellungsdatei.
+
+# src/settings_window/providers/dialog.rs
+linux-credential-saved-in-windows-user-storage = Anmeldedaten gespeichert, verschlüsselt mit Ihrem Systemschlüsselbund.
+
+# src/settings_window/providers/dialog.rs
+linux-api-key-saved-in-windows-user-storage = API-Schlüssel gespeichert, verschlüsselt mit Ihrem Systemschlüsselbund.
+
+# src/settings_window/providers/page.rs
+linux-saved-in-windows-user-storage = Mit Ihrem Systemschlüsselbund verschlüsselt
+
+# src/settings_window/general.rs
+linux-applies-immediately-to-every-app-window-and-notification-auto-fol = Gilt sofort für alle App-Fenster und Benachrichtigungen. „Automatisch“ folgt der Systemsprache.
+
+# src/settings_window/providers/dialog.rs
+linux-runs-claude-code-s-own-login-for-name-with-its-config-folder-as-c = Führt Claude Codes eigene Anmeldung für { $name } mit seinem Konfigurationsordner als CLAUDE_CONFIG_DIR aus. Die Anmeldung bleibt in diesem Ordner, wo Claude Code sie aktuell hält.
+
+# src/settings_window/advanced.rs
+linux-add-a-game-description = Von Steam gestartete Spiele und Spiele in Steam- oder Heroic-Bibliotheken werden selbst erkannt. Fügen Sie hier beliebige andere Programme hinzu.
+linux-popup-shortcut-native-description = Wird in den Tastatureinstellungen Ihres Desktops gespeichert. Änderungen gelten sofort.
+linux-popup-shortcut-choose = Tastenkürzel festlegen
+linux-popup-shortcut-dialog-hint = Drücken Sie die gewünschte Tastenkombination. Sie wird als benutzerdefiniertes Kürzel in den Tastatureinstellungen Ihres Desktops gespeichert.
+linux-popup-shortcut-needs-modifier = Verwenden Sie Strg, Alt oder Super oder nutzen Sie F13–F24.
+linux-popup-shortcut-save-failed = Der Desktop hat das Tastenkürzel nicht übernommen. Versuchen Sie es erneut oder fügen Sie den Befehl in den Tastatureinstellungen hinzu.
+# src/settings_window/providers.rs
+linux-reads-subscription-quota-from-your-existing-official-agy-windows = Liest das Abonnementkontingent aus Ihrer bestehenden offiziellen agy-Anmeldung.
+linux-folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut = Ordner mit der ausführbaren agy-Datei. Lassen Sie das Feld leer, damit sie automatisch gefunden wird.
+
+linux-folder-with-grok-cli = Ordner mit der ausführbaren Datei grok. Leer lassen, um sie automatisch zu finden.
+linux-folder-with-command-code-cli = Ordner mit command-code oder cmd. Leer lassen, um sie automatisch zu finden.
