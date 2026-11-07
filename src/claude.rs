@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    process::{Command, Stdio},
     sync::{Arc, OnceLock},
     thread,
     time::{Duration, Instant},
@@ -13,6 +13,7 @@ use chrono::{DateTime, Utc};
 use directories::BaseDirs;
 use serde::Deserialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 use crate::{
     claude_desktop,
@@ -115,6 +116,8 @@ fn common_launcher_dirs() -> Vec<PathBuf> {
         #[cfg(not(windows))]
         dirs.push(base.home_dir().join(".npm-global/bin"));
     }
+    #[cfg(not(windows))]
+    dirs.extend(crate::linux::node_discovery::bin_dirs());
     #[cfg(windows)]
     {
         if let Some(roaming) = std::env::var_os("APPDATA") {
@@ -133,7 +136,7 @@ fn common_launcher_dirs() -> Vec<PathBuf> {
 }
 
 fn explicit_launcher(path: &Path) -> Option<PathBuf> {
-    if path.is_file() {
+    if is_cli_launcher(path) {
         return Some(path.to_path_buf());
     }
     launcher_in(path)
@@ -147,7 +150,18 @@ fn launcher_in(directory: &Path) -> Option<PathBuf> {
     names
         .into_iter()
         .map(|name| directory.join(name))
-        .find(|path| path.is_file())
+        .find(|path| is_cli_launcher(path))
+}
+
+fn is_cli_launcher(path: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        path.is_file()
+    }
+    #[cfg(not(windows))]
+    {
+        crate::linux::apps::is_executable(path)
+    }
 }
 
 /// Starts Claude Code's five-hour window with the smallest supported prompt.
@@ -183,11 +197,11 @@ impl ClaudeActivator {
         };
         let mut command = activation_command_for(program);
         scope_command(&mut command, folder);
-        let mut child = command
+        command
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
+            .stderr(Stdio::null());
+        let mut child = crate::provider_cli::spawn_command(command)
             .context("launch Claude activation through `claude`")?;
         let deadline = Instant::now() + self.timeout;
         loop {
@@ -225,6 +239,7 @@ fn activation_command_for(program: PathBuf) -> Command {
         ACTIVATION_MODEL,
         "--effort=low",
     ]);
+    crate::provider_cli::disable_auto_update(&mut command);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -233,7 +248,7 @@ fn activation_command_for(program: PathBuf) -> Command {
     command
 }
 
-fn terminate(child: &mut Child) {
+fn terminate(child: &mut crate::provider_cli::ManagedChild) {
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -391,6 +406,7 @@ struct RefreshAttempt {
 
 #[derive(Default)]
 struct ClaudeAccountCache {
+    credential_digest: Option<[u8; 32]>,
     account_name: Option<String>,
     plan_type: Option<String>,
     checked_at: Option<Instant>,
@@ -398,6 +414,17 @@ struct ClaudeAccountCache {
 }
 
 impl ClaudeAccountCache {
+    /// Keep only a digest in memory; never persist or log the credential.
+    fn select_credential(&mut self, access_token: &str) {
+        let digest: [u8; 32] = Sha256::digest(access_token.as_bytes()).into();
+        if self.credential_digest != Some(digest) {
+            *self = Self {
+                credential_digest: Some(digest),
+                ..Self::default()
+            };
+        }
+    }
+
     fn needs_refresh(&self, reset_schedule: &[(String, Option<DateTime<Utc>>)]) -> bool {
         self.checked_at
             .is_none_or(|checked_at| checked_at.elapsed() >= PROFILE_REFRESH_INTERVAL)
@@ -634,8 +661,8 @@ impl ClaudeClient {
         }
         // `ureq` is built without its default Rustls backend. Configure the
         // native TLS adapter explicitly so Claude's HTTPS endpoint uses the
-        // Windows certificate store (Schannel), as the updater already does.
-        let tls = ureq::native_tls::TlsConnector::new().context("create Windows TLS connector")?;
+        // platform certificate configuration, as the updater already does.
+        let tls = ureq::native_tls::TlsConnector::new().context("create native TLS connector")?;
         let agent = ureq::AgentBuilder::new()
             .timeout(self.timeout)
             .tls_connector(Arc::new(tls))
@@ -650,6 +677,8 @@ impl ClaudeClient {
         sign_in_hint: &str,
         local_plan_type: Option<String>,
     ) -> Result<RateLimits> {
+        // Drop the old identity even when the new account's request fails.
+        self.account_cache.select_credential(access_token);
         let body = send(
             agent
                 .get(OAUTH_USAGE_URL)
@@ -744,6 +773,43 @@ fn read_credential_file(path: &Path) -> Result<Value> {
     serde_json::from_slice(&contents).with_context(|| format!("parse {}", path.display()))
 }
 
+fn renewal_expiry(now: i64, seconds: i64) -> Result<i64> {
+    let expires_at = seconds
+        .checked_mul(1000)
+        .and_then(|millis| now.checked_add(millis))
+        .filter(|_| seconds > 0)
+        .filter(|millis| DateTime::<Utc>::from_timestamp_millis(*millis).is_some())
+        .context("Claude login renewal returned an out-of-range expiry")?;
+    Ok(expires_at)
+}
+
+/// `None` denotes a definitively rejected refresh token.
+fn read_renewal_response(
+    response: std::result::Result<ureq::Response, ureq::Error>,
+) -> Result<Option<String>> {
+    match response {
+        Ok(response) => response
+            .into_string()
+            .context("read Claude login renewal response")
+            .map(Some),
+        Err(ureq::Error::Status(status @ (400 | 401), response)) => {
+            let body = response.into_string().unwrap_or_default();
+            if oauth_error_code(&body).as_deref() == Some("invalid_grant") {
+                crate::logger::info("Claude rejected a login renewal (invalid_grant)");
+                return Ok(None);
+            }
+            bail!("Claude login renewal failed with HTTP {status}")
+        }
+        Err(ureq::Error::Status(429, _)) => Err(crate::worker::rate_limit_error(
+            "Claude login renewal is rate limited; it will be retried",
+        )),
+        Err(ureq::Error::Status(status, _)) => {
+            bail!("Claude login renewal failed with HTTP {status}")
+        }
+        Err(error) => Err(error).context("renew Claude login"),
+    }
+}
+
 /// Renews a CLI login with its refresh token, exactly as Claude Code does,
 /// and writes the new tokens back into the same file. Only an expired login
 /// is renewed, and a running Claude Code renews ahead of expiry, so this
@@ -778,30 +844,15 @@ fn refresh_cli_login(agent: &ureq::Agent, refresh: &FileRefresh) -> Result<Renew
     if !scopes.is_empty() {
         body["scope"] = Value::String(scopes);
     }
-    let response = match agent
-        .post(OAUTH_TOKEN_URL)
-        .set("Content-Type", "application/json")
-        .set("Accept", "application/json")
-        .send_string(&body.to_string())
-    {
-        Ok(response) => response
-            .into_string()
-            .context("read Claude login renewal response")?,
-        Err(ureq::Error::Status(status @ (400 | 401), response)) => {
-            let body = response.into_string().unwrap_or_default();
-            if oauth_error_code(&body).as_deref() == Some("invalid_grant") {
-                crate::logger::info("Claude rejected a login renewal (invalid_grant)");
-                return Ok(Renewal::Rejected);
-            }
-            bail!("Claude login renewal failed with HTTP {status}")
-        }
-        Err(ureq::Error::Status(429, _)) => {
-            bail!("Claude login renewal is rate limited; it will be retried")
-        }
-        Err(ureq::Error::Status(status, _)) => {
-            bail!("Claude login renewal failed with HTTP {status}")
-        }
-        Err(error) => return Err(error).context("renew Claude login"),
+    let Some(response) = read_renewal_response(
+        agent
+            .post(OAUTH_TOKEN_URL)
+            .set("Content-Type", "application/json")
+            .set("Accept", "application/json")
+            .send_string(&body.to_string()),
+    )?
+    else {
+        return Ok(Renewal::Rejected);
     };
     let renewed: TokenResponse =
         serde_json::from_str(&response).context("parse Claude login renewal response")?;
@@ -810,6 +861,12 @@ fn refresh_cli_login(agent: &ureq::Agent, refresh: &FileRefresh) -> Result<Renew
         "Claude login renewal returned no access token"
     );
     let now = Utc::now().timestamp_millis();
+    let expires_at = renewal_expiry(now, renewed.expires_in)?;
+    // The refresh-token deadline is optional metadata: an unusable value must
+    // not discard an otherwise valid renewal.
+    let refresh_expires_at = renewed
+        .refresh_token_expires_in
+        .and_then(|seconds| renewal_expiry(now, seconds).ok());
     let mut file = read_credential_file(&refresh.path)?;
     if oauth_refresh_token(&file) != Some(refresh.refresh_token.as_str()) {
         crate::logger::info("Claude Code renewed the login first; keeping its tokens");
@@ -825,15 +882,9 @@ fn refresh_cli_login(agent: &ureq::Agent, refresh: &FileRefresh) -> Result<Renew
     {
         oauth.insert("refreshToken".into(), token.into());
     }
-    oauth.insert(
-        "expiresAt".into(),
-        (now + renewed.expires_in.saturating_mul(1000)).into(),
-    );
-    if let Some(seconds) = renewed.refresh_token_expires_in {
-        oauth.insert(
-            "refreshTokenExpiresAt".into(),
-            (now + seconds.saturating_mul(1000)).into(),
-        );
+    oauth.insert("expiresAt".into(), expires_at.into());
+    if let Some(expires_at) = refresh_expires_at {
+        oauth.insert("refreshTokenExpiresAt".into(), expires_at.into());
     }
     if let Some(scope) = renewed.scope.filter(|scope| !scope.trim().is_empty()) {
         oauth.insert(
@@ -1238,7 +1289,9 @@ fn load_cli_credentials_at(path: &Path) -> Result<Credentials> {
         .refresh_expires_at_millis
         .and_then(DateTime::from_timestamp_millis)
         .filter(|login| {
-            expires_at.is_none_or(|access| access <= *login + chrono::Duration::days(3))
+            expires_at.is_none_or(|access| {
+                access.signed_duration_since(*login) <= chrono::Duration::days(3)
+            })
         });
     Ok(Credentials {
         access_token,
@@ -1780,6 +1833,38 @@ mod tests {
 
     use super::*;
 
+    #[cfg(not(windows))]
+    #[test]
+    fn unusable_unix_launchers_do_not_shadow_working_claude_installations() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        let root = tempfile::tempdir().unwrap();
+        let bad = root.path().join("bad");
+        let good = root.path().join("good");
+        let alias = root.path().join("alias");
+        for directory in [&bad, &good, &alias] {
+            fs::create_dir(directory).unwrap();
+        }
+        fs::write(bad.join("claude"), b"unfinished download").unwrap();
+        let executable = good.join("claude");
+        fs::write(&executable, b"fixture").unwrap();
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+        let dirs = [bad.clone(), good.clone()];
+        assert_eq!(find_cli(None, &dirs, &[]), Some(executable.clone()));
+        assert_eq!(
+            find_cli(Some(&bad), &[], std::slice::from_ref(&good)),
+            Some(executable.clone())
+        );
+        assert_eq!(
+            find_cli(Some(&bad.join("claude")), &dirs, &[]),
+            Some(executable.clone())
+        );
+        symlink(&executable, alias.join("claude")).unwrap();
+        assert_eq!(
+            find_cli(Some(&alias), &dirs, &[]),
+            Some(alias.join("claude"))
+        );
+    }
+
     #[test]
     fn finds_native_cli_when_path_is_missing_and_honors_overrides() {
         let root = tempfile::tempdir().unwrap();
@@ -1793,6 +1878,12 @@ mod tests {
         for directory in [&native, &on_path, &explicit] {
             fs::create_dir_all(directory).unwrap();
             fs::write(directory.join(name), b"fixture, never executed").unwrap();
+            #[cfg(not(windows))]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(directory.join(name), fs::Permissions::from_mode(0o755))
+                    .unwrap();
+            }
         }
         let common = std::slice::from_ref(&native);
         assert_eq!(find_cli(None, &[], common), Some(native.join(name)));
@@ -1948,6 +2039,39 @@ mod tests {
     }
 
     #[test]
+    fn renewal_rejects_unrepresentable_expiry() {
+        for seconds in [i64::MAX, i64::MAX / 1000, -1, 0] {
+            let response: TokenResponse = serde_json::from_value(serde_json::json!({
+                "access_token": "token", "expires_in": seconds
+            }))
+            .unwrap();
+            assert!(renewal_expiry(Utc::now().timestamp_millis(), response.expires_in).is_err());
+        }
+        assert_eq!(renewal_expiry(1000, 60).unwrap(), 61000);
+    }
+
+    #[test]
+    fn cli_credentials_accept_refresh_deadline_near_datetime_maximum() {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join(".credentials.json");
+        let max = DateTime::<Utc>::MAX_UTC.timestamp_millis();
+        fs::write(
+            &path,
+            serde_json::json!({"claudeAiOauth": {
+                "accessToken": "a", "expiresAt": max, "refreshTokenExpiresAt": max
+            }})
+            .to_string(),
+        )
+        .unwrap();
+        assert!(
+            load_cli_credentials_at(&path)
+                .unwrap()
+                .login_expires_at
+                .is_some()
+        );
+    }
+
+    #[test]
     fn login_deadline_follows_claude_codes_rule() {
         let folder = tempfile::tempdir().unwrap();
         let path = folder.path().join(".credentials.json");
@@ -2014,6 +2138,42 @@ mod tests {
             executable_for(None, Some(folder.path())),
             cli_available(None)
         );
+    }
+
+    #[test]
+    fn account_cache_discards_identity_when_credentials_change() {
+        let schedule = vec![("primary".into(), None)];
+        let mut cache = ClaudeAccountCache::default();
+        cache.select_credential("account-a-token");
+        cache.record(
+            Some("Account A".into()),
+            Some("pro".into()),
+            schedule.clone(),
+        );
+        cache.select_credential("account-a-token");
+        assert!(!cache.needs_refresh(&schedule));
+        assert_eq!(cache.account_name.as_deref(), Some("Account A"));
+
+        cache.select_credential("account-b-token");
+        assert!(cache.needs_refresh(&schedule));
+        assert!(cache.account_name.is_none());
+        assert!(cache.plan_type.is_none());
+        cache.record(
+            Some("Account B".into()),
+            Some("max".into()),
+            schedule.clone(),
+        );
+        assert!(!cache.needs_refresh(&schedule));
+        assert_eq!(cache.account_name.as_deref(), Some("Account B"));
+    }
+
+    #[test]
+    fn renewal_throttling_keeps_the_shared_worker_pause_signal() {
+        let response = ureq::Response::new(429, "Too Many Requests", "").unwrap();
+        let error = read_renewal_response(Err(ureq::Error::Status(429, response)))
+            .unwrap_err()
+            .context("Claude login has expired");
+        assert!(crate::worker::is_rate_limited_error(&error));
     }
 
     #[test]
@@ -2366,5 +2526,37 @@ mod tests {
         )
         .unwrap();
         assert_eq!(limits.spending.unwrap().used_microusd, 2_000_000);
+    }
+
+    #[test]
+    fn oauth_future_windows_preserve_offsets_without_inventing_missing_usage() {
+        let limits = parse_usage_response(
+            r#"{
+            "five_hour": null,
+            "seven_day": {"utilization": 120.4, "resets_at": "2026-11-01T01:30:00-04:00"},
+            "seven_day_future_model": {"utilization": 12.6, "resets_at": "invalid"},
+            "future_metadata": {"status": "unknown"},
+            "future_null": null
+        }"#,
+            Utc::now(),
+        )
+        .unwrap();
+        assert_eq!(limits.primary, LimitWindow::default());
+        assert_eq!(limits.secondary.used_percent, Some(100));
+        assert_eq!(
+            limits.secondary.resets_at,
+            Some("2026-11-01T05:30:00Z".parse().unwrap())
+        );
+        assert_eq!(limits.additional_limits.len(), 1);
+        assert_eq!(limits.additional_limits[0].id, "seven_day_future_model");
+        assert_eq!(limits.additional_limits[0].window.used_percent, Some(13));
+        assert_eq!(limits.additional_limits[0].window.resets_at, None);
+        for raw in [
+            r#"{}"#,
+            r#"{"five_hour":null,"seven_day":null}"#,
+            r#"{"five_hour":{"utilization":"unknown"}}"#,
+        ] {
+            assert!(parse_usage_response(raw, Utc::now()).is_err(), "{raw}");
+        }
     }
 }

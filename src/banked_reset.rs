@@ -13,19 +13,24 @@ pub(crate) fn account_key(driver: &str, folder: &std::path::Path, account: &str)
     let folder = folder
         .canonicalize()
         .unwrap_or_else(|_| folder.to_path_buf());
-    let folder = folder.to_string_lossy();
-    let folder = if cfg!(windows) {
-        folder.to_lowercase()
-    } else {
-        folder.into_owned()
+    #[cfg(windows)]
+    let folder = folder.to_string_lossy().to_lowercase();
+    #[cfg(not(windows))]
+    let folder = {
+        use base64::Engine;
+        base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(folder.as_os_str().as_encoded_bytes())
     };
-    format!("{driver}:{folder}:{account}")
+    // Structured components cannot collide when a folder or account ID
+    // contains a colon. This key is only used by the in-memory retry map.
+    serde_json::json!([driver, folder, account]).to_string()
 }
 
 pub(crate) fn consume(
     instance: &crate::instances::ProviderInstance,
 ) -> Result<(Outcome, Result<crate::limits::RateLimits>)> {
     match instance.driver {
+        driver if crate::fake::serves(driver) => crate::fake::consume(driver),
         crate::settings::ProviderKind::Codex => {
             let executable = crate::codex::first_available(instance.binary_path.as_deref())?;
             let client = crate::codex::CodexClient::for_instance(executable, instance);
@@ -39,6 +44,37 @@ pub(crate) fn consume(
         }
         _ => bail!("Provider does not support reset credits"),
     }
+}
+
+/// A choice made on the "reset will be applied soon" notification. The
+/// automatic-reset scheduler on the bridge thread picks it up.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AutoResetChoice {
+    ApplyNow(crate::instances::ProviderId),
+    /// Do not spend the currently announced credit automatically.
+    Skip(crate::instances::ProviderId),
+}
+
+static PROCESS_STARTED: OnceLock<chrono::DateTime<chrono::Utc>> = OnceLock::new();
+
+/// Marks the moment this process started, before workers publish anything.
+/// Quota snapshots sampled earlier were cached by a previous run.
+pub fn mark_process_start() {
+    PROCESS_STARTED.get_or_init(chrono::Utc::now);
+}
+
+pub(crate) fn process_started_at() -> chrono::DateTime<chrono::Utc> {
+    *PROCESS_STARTED.get_or_init(chrono::Utc::now)
+}
+
+static AUTO_RESET_CHOICES: Mutex<Vec<AutoResetChoice>> = Mutex::new(Vec::new());
+
+pub fn choose(choice: AutoResetChoice) {
+    AUTO_RESET_CHOICES.lock().unwrap().push(choice);
+}
+
+pub(crate) fn take_choices() -> Vec<AutoResetChoice> {
+    std::mem::take(&mut *AUTO_RESET_CHOICES.lock().unwrap())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -165,6 +201,39 @@ pub(crate) fn settled(key: &'static str) -> anyhow::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(windows))]
+    #[test]
+    fn unix_account_keys_preserve_raw_folder_bytes() {
+        use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+        let root = tempfile::tempdir().unwrap();
+        let first = root.path().join(OsString::from_vec(vec![b'a', 0x80]));
+        let second = root.path().join(OsString::from_vec(vec![b'a', 0x81]));
+        std::fs::create_dir(&first).unwrap();
+        std::fs::create_dir(&second).unwrap();
+        assert_eq!(first.to_string_lossy(), second.to_string_lossy());
+        assert_ne!(
+            account_key("claude", &first, "team"),
+            account_key("claude", &second, "team")
+        );
+    }
+
+    #[test]
+    fn account_key_components_cannot_merge_at_separator_boundaries() {
+        let root = tempfile::tempdir().unwrap();
+        let first = root.path().join("account");
+        let second = root.path().join("account:team");
+        // Colons are not valid Windows filename characters; the key must
+        // still distinguish configured paths even before they exist.
+        assert_ne!(
+            account_key("claude", &first, "team:member"),
+            account_key("claude", &second, "member")
+        );
+        assert_ne!(
+            account_key("claude", &first, "team"),
+            account_key("codex", &first, "team")
+        );
+    }
+
     #[test]
     fn reset_account_key_canonicalizes_folder_without_merging_team_logins() {
         let first = tempfile::tempdir().unwrap();
