@@ -41,6 +41,8 @@ mod notifications;
 mod onboarding;
 mod persistence;
 mod providers;
+#[cfg(not(windows))]
+mod shortcut;
 mod taskbar;
 pub(crate) mod theme;
 mod tray;
@@ -91,6 +93,7 @@ pub(crate) enum Command {
     DiscoveredBricks(BTreeMap<String, String>),
     OpenRouter(OpenRouterSettingsSnapshot),
     /// The popup shortcut's registration status changed.
+    #[cfg(windows)]
     HotkeyStatus,
     /// Open Settings on the Taskbar page, with one widget's editor open.
     OpenTaskbar(Option<String>),
@@ -149,6 +152,7 @@ pub(crate) fn is_open() -> bool {
 }
 
 /// Repaint Settings after the popup shortcut was (un)registered.
+#[cfg(windows)]
 pub(crate) fn refresh_hotkey_status() {
     if SETTINGS_OPEN.load(Ordering::SeqCst) {
         post(Command::HotkeyStatus);
@@ -157,7 +161,7 @@ pub(crate) fn refresh_hotkey_status() {
 
 /// Push a committed settings snapshot into the open window.
 pub fn sync_open_window(settings: Settings) {
-    if SETTINGS_OPEN.load(Ordering::SeqCst) {
+    if is_open() {
         post(Command::Sync(Box::new(settings)));
     }
 }
@@ -262,9 +266,12 @@ pub(crate) fn handle(command: Command, state: &Arc<AppState>, cx: &mut AsyncApp)
             close_existing(&SETTINGS_WINDOW, cx);
             open_onboarding_window(Arc::clone(state), cx);
         }
-        Command::Sync(settings) => with_settings_window(cx, |root, cx| {
-            root.apply_sync(*settings, cx);
-        }),
+        Command::Sync(settings) => {
+            with_settings_window(cx, |root, cx| root.apply_sync((*settings).clone(), cx));
+            if let Some(handle) = ONBOARDING_WINDOW.with(|slot| *slot.borrow()) {
+                let _ = handle.update(cx, |root, _, cx| root.apply_sync(*settings, cx));
+            }
+        }
         Command::DiscoveredBricks(labels) => with_settings_window(cx, |root, cx| {
             root.discovered_bricks = labels;
             cx.notify();
@@ -273,6 +280,7 @@ pub(crate) fn handle(command: Command, state: &Arc<AppState>, cx: &mut AsyncApp)
             root.openrouter = snapshot;
             cx.notify();
         }),
+        #[cfg(windows)]
         Command::HotkeyStatus => with_settings_window(cx, |_, cx| cx.notify()),
         Command::OpenTaskbar(widget) => {
             if focus_existing(&ONBOARDING_WINDOW, cx) {
@@ -313,6 +321,15 @@ fn with_settings_window(
     }
 }
 
+fn activate_window(window: &gpui::Window) {
+    #[cfg(not(windows))]
+    if let Some(token) = crate::linux::instance::take_activation_token() {
+        window.activate_window_with_token(token);
+        return;
+    }
+    window.activate_window();
+}
+
 fn focus_existing<V: 'static>(
     slot: &'static std::thread::LocalKey<RefCell<Option<WindowHandle<V>>>>,
     cx: &mut AsyncApp,
@@ -321,7 +338,7 @@ fn focus_existing<V: 'static>(
         return false;
     };
     let alive = handle
-        .update(cx, |_, window, _| window.activate_window())
+        .update(cx, |_, window, _| activate_window(window))
         .is_ok();
     if !alive {
         slot.with(|slot| slot.borrow_mut().take());
@@ -362,10 +379,15 @@ fn window_options(
         is_minimizable: true,
         display_id: None,
         window_background: WindowBackgroundAppearance::Opaque,
+        #[cfg(windows)]
         app_id: Some("CodexMinibar".into()),
+        #[cfg(not(windows))]
+        app_id: Some(crate::linux::identity::APP_ID.into()),
         window_min_size: Some(size(px(min.0), px(min.1))),
         window_max_size: Some(size(px(max.0), px(max.1))),
-        window_decorations: None,
+        // Linux: our own caption is the title bar. GPUI would otherwise ask
+        // X11 and KDE window managers for a second, native one.
+        window_decorations: (!cfg!(windows)).then_some(gpui::WindowDecorations::Client),
         tabbing_identifier: None,
     }
 }
@@ -388,7 +410,7 @@ fn open_settings_window(state: Arc<AppState>, cx: &mut AsyncApp) {
         Ok(Ok(handle)) => {
             SETTINGS_OPEN.store(true, Ordering::SeqCst);
             SETTINGS_WINDOW.with(|slot| *slot.borrow_mut() = Some(handle));
-            let _ = handle.update(cx, |_, window, _| window.activate_window());
+            let _ = handle.update(cx, |_, window, _| activate_window(window));
         }
         Ok(Err(error)) => eprintln!("Could not open settings window: {error:#}"),
         Err(error) => eprintln!("Could not open settings window: {error:#}"),
@@ -420,7 +442,7 @@ fn open_onboarding_window(state: Arc<AppState>, cx: &mut AsyncApp) {
             if !crate::popup::is_visible() || crate::popup::is_closing() {
                 crate::popup::show_on_primary();
             }
-            let _ = handle.update(cx, |_, window, _| window.activate_window());
+            let _ = handle.update(cx, |_, window, _| activate_window(window));
         }
         Ok(Err(error)) => eprintln!("Could not open onboarding: {error:#}"),
         Err(error) => eprintln!("Could not open onboarding: {error:#}"),

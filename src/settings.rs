@@ -670,6 +670,72 @@ impl ResetAnnouncementRefreshInterval {
     }
 }
 
+/// How long before a banked reset credit expires Minibar spends it on the
+/// user's behalf when automatic resets are on for an instance.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoResetLead {
+    Minutes5,
+    #[default]
+    Minutes30,
+    Hour1,
+    Hours3,
+    Hours6,
+    Hours12,
+    Hours24,
+}
+
+impl AutoResetLead {
+    /// Dropdown order.
+    pub const ALL: [Self; 7] = [
+        Self::Minutes5,
+        Self::Minutes30,
+        Self::Hour1,
+        Self::Hours3,
+        Self::Hours6,
+        Self::Hours12,
+        Self::Hours24,
+    ];
+
+    pub const fn minutes(self) -> i64 {
+        match self {
+            Self::Minutes5 => 5,
+            Self::Minutes30 => 30,
+            Self::Hour1 => 60,
+            Self::Hours3 => 3 * 60,
+            Self::Hours6 => 6 * 60,
+            Self::Hours12 => 12 * 60,
+            Self::Hours24 => 24 * 60,
+        }
+    }
+
+    pub const fn label_key(self) -> &'static str {
+        match self {
+            Self::Minutes5 => "msg-5-minutes",
+            Self::Minutes30 => "msg-30-minutes",
+            Self::Hour1 => "msg-1-hour",
+            Self::Hours3 => "msg-3-hours",
+            Self::Hours6 => "msg-6-hours",
+            Self::Hours12 => "msg-12-hours",
+            Self::Hours24 => "msg-24-hours",
+        }
+    }
+
+    pub fn index(self) -> i32 {
+        Self::ALL
+            .iter()
+            .position(|lead| *lead == self)
+            .map_or(1, |index| index as i32)
+    }
+
+    pub fn from_index(index: i32) -> Self {
+        usize::try_from(index)
+            .ok()
+            .and_then(|index| Self::ALL.get(index).copied())
+            .unwrap_or_default()
+    }
+}
+
 impl UsageRefreshInterval {
     pub const fn seconds(self) -> u64 {
         match self {
@@ -2076,13 +2142,15 @@ pub struct NotificationSettings {
     pub follow_do_not_disturb: bool,
     /// Notify when game mode turns on or off.
     pub game_mode_changes: bool,
+    /// Warn shortly before an automatic reset spends a banked reset credit.
+    pub auto_reset_upcoming: bool,
 }
 
 impl Default for NotificationSettings {
     fn default() -> Self {
         Self {
             activation_success: true,
-            activation_failure: true,
+            activation_failure: false,
             codex_unavailable: false,
             approaching_reset: false,
             limits_changed: true,
@@ -2098,7 +2166,99 @@ impl Default for NotificationSettings {
             sound: true,
             follow_do_not_disturb: true,
             game_mode_changes: false,
+            auto_reset_upcoming: true,
         }
+    }
+}
+
+/// Where the popup opens. `Auto` follows the tray and taskbar, which only
+/// Windows can locate; the others are fixed spots of the work area.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PopupPlacement {
+    #[default]
+    Auto,
+    TopLeft,
+    TopCenter,
+    TopRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+}
+
+impl PopupPlacement {
+    const ALL: [Self; 7] = [
+        Self::Auto,
+        Self::TopLeft,
+        Self::TopCenter,
+        Self::TopRight,
+        Self::BottomLeft,
+        Self::BottomCenter,
+        Self::BottomRight,
+    ];
+
+    /// The choices Settings offers on this platform.
+    pub fn choices() -> &'static [Self] {
+        if cfg!(windows) {
+            &Self::ALL
+        } else {
+            &Self::ALL[1..]
+        }
+    }
+
+    /// `Auto` means nothing on Linux, where a settings file can still carry it.
+    pub fn resolved(self) -> Self {
+        if self == Self::Auto && !cfg!(windows) {
+            Self::TopRight
+        } else {
+            self
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Auto => crate::i18n::tr("popup-placement-auto"),
+            Self::TopLeft => crate::i18n::tr("popup-placement-top-left"),
+            Self::TopCenter => crate::i18n::tr("popup-placement-top-center"),
+            Self::TopRight => crate::i18n::tr("popup-placement-top-right"),
+            Self::BottomLeft => crate::i18n::tr("popup-placement-bottom-left"),
+            Self::BottomCenter => crate::i18n::tr("popup-placement-bottom-center"),
+            Self::BottomRight => crate::i18n::tr("popup-placement-bottom-right"),
+        }
+    }
+
+    pub fn is_left(self) -> bool {
+        matches!(self, Self::TopLeft | Self::BottomLeft)
+    }
+
+    pub fn is_center(self) -> bool {
+        matches!(self, Self::TopCenter | Self::BottomCenter)
+    }
+
+    pub fn is_top(self) -> bool {
+        matches!(self, Self::TopLeft | Self::TopCenter | Self::TopRight)
+    }
+
+    /// Top-left of a `size` box in this spot of the work area
+    /// (`left, top, right, bottom`), `margin` away from its edges. `Auto` has
+    /// no spot of its own and lands in the top-right corner.
+    pub fn origin(self, work: (i32, i32, i32, i32), margin: i32, size: (i32, i32)) -> (i32, i32) {
+        let (left, top, right, bottom) = work;
+        let max_x = (right - margin - size.0).max(left);
+        let max_y = (bottom - margin - size.1).max(top);
+        let x = if self.is_left() {
+            (left + margin).min(max_x)
+        } else if self.is_center() {
+            (left + (right - left - size.0) / 2).max(left)
+        } else {
+            max_x
+        };
+        let y = if self.is_top() || self == Self::Auto {
+            (top + margin).min(max_y)
+        } else {
+            max_y
+        };
+        (x, y)
     }
 }
 
@@ -2180,6 +2340,8 @@ pub struct Settings {
     pub scheduled_activations: Vec<ScheduledActivation>,
     /// Weekly local-time periods that suppress automatic activation per provider.
     pub auto_activation_pauses: Vec<AutoActivationPause>,
+    /// How long before expiry automatic resets spend a banked reset credit.
+    pub auto_reset_lead: AutoResetLead,
     /// Enables the Usage tab, Usage Stats home card, and background usage collection.
     pub usage_stats_enabled: bool,
     pub usage_refresh_interval: UsageRefreshInterval,
@@ -2209,6 +2371,9 @@ pub struct Settings {
     /// User-selected popup height in DIPs, shared by tray and floating modes.
     pub popup_height_dip: Option<u32>,
     pub popup_position: Option<PopupPosition>,
+    /// Where the popup opens. A dragged floating panel stays at `popup_position`
+    /// until this is changed or the position is reset.
+    pub popup_placement: PopupPlacement,
     /// System-wide shortcut that shows or hides the popup. None leaves every
     /// key combination to other applications.
     pub popup_hotkey: Option<crate::hotkey::Hotkey>,
@@ -2274,6 +2439,7 @@ impl Default for Settings {
             replace_chatgpt_logo_with_codex: false,
             scheduled_activations: Vec::new(),
             auto_activation_pauses: Vec::new(),
+            auto_reset_lead: AutoResetLead::default(),
             usage_stats_enabled: true,
             usage_refresh_interval: UsageRefreshInterval::default(),
             reset_announcement_refresh_interval: ResetAnnouncementRefreshInterval::default(),
@@ -2288,10 +2454,16 @@ impl Default for Settings {
             show_account_name: false,
             show_edit_home_button: true,
             show_popup_action_bar: true,
-            popup_pinned: false,
-            popup_floating: false,
+            popup_pinned: !cfg!(windows),
+            // Linux has no tray position to open beside.
+            popup_floating: !cfg!(windows),
             popup_height_dip: None,
             popup_position: None,
+            popup_placement: if cfg!(windows) {
+                PopupPlacement::Auto
+            } else {
+                PopupPlacement::TopRight
+            },
             popup_hotkey: None,
             // An empty list intentionally means "show the ordinary app icon".
             tray_widgets: Vec::new(),
@@ -2334,6 +2506,9 @@ impl Settings {
     }
 
     pub fn default_path() -> Result<PathBuf> {
+        if crate::fake::enabled() {
+            return Ok(crate::fake::settings_path());
+        }
         let dirs = ProjectDirs::from("dev", "Codex Minibar", "Codex Minibar")
             .context("could not resolve the application config directory")?;
         Ok(dirs.config_dir().join("settings.toml"))
@@ -3004,6 +3179,10 @@ impl Settings {
                 .filter_map(|instance| instance.binary_path.as_deref()),
         );
         self.time_format.apply();
+        // The sandbox must never rewrite the real install's login entry.
+        if crate::fake::enabled() {
+            return Ok(());
+        }
         apply_startup_registration(self.start_at_login)
     }
 
@@ -3011,7 +3190,7 @@ impl Settings {
     /// settings still say off, adopt that into settings before we apply them —
     /// otherwise `apply_runtime_effects` would delete the Run value on launch.
     pub fn reconcile_startup_from_registry(&mut self, path: &Path) -> Result<()> {
-        if self.start_at_login || !startup_registration_present()? {
+        if crate::fake::enabled() || self.start_at_login || !startup_registration_present()? {
             return Ok(());
         }
         self.start_at_login = true;
@@ -3061,7 +3240,7 @@ fn startup_registration_present() -> Result<bool> {
 
 #[cfg(not(windows))]
 fn startup_registration_present() -> Result<bool> {
-    Ok(false)
+    crate::linux::autostart::is_registered()
 }
 
 #[cfg(windows)]
@@ -3131,8 +3310,8 @@ fn apply_startup_registration(enabled: bool) -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn apply_startup_registration(_enabled: bool) -> Result<()> {
-    Ok(())
+fn apply_startup_registration(enabled: bool) -> Result<()> {
+    crate::linux::autostart::apply(enabled)
 }
 
 /// The `version` a raw settings file claims, or 0 when it has none.
@@ -3917,6 +4096,52 @@ fn migrate(document: &mut toml::Value, mut version: u32) -> Result<()> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn popup_placement_spots_stay_inside_the_work_area() {
+        use PopupPlacement::*;
+        let work = (0, 40, 1920, 1040);
+        for (placement, expected) in [
+            (TopLeft, (20, 60)),
+            (TopCenter, (770, 60)),
+            (TopRight, (1520, 60)),
+            (BottomLeft, (20, 420)),
+            (BottomCenter, (770, 420)),
+            (BottomRight, (1520, 420)),
+            (Auto, (1520, 60)),
+        ] {
+            assert_eq!(placement.origin(work, 20, (380, 600)), expected);
+        }
+        // Taller and wider than the work area: pinned to its top-left.
+        for placement in PopupPlacement::ALL {
+            assert_eq!(placement.origin(work, 20, (3000, 2000)), (0, 40));
+        }
+    }
+
+    #[test]
+    fn popup_placement_auto_is_windows_only_and_roundtrips() {
+        assert_eq!(
+            PopupPlacement::choices().contains(&PopupPlacement::Auto),
+            cfg!(windows)
+        );
+        assert_eq!(
+            PopupPlacement::Auto.resolved() == PopupPlacement::Auto,
+            cfg!(windows)
+        );
+        assert_eq!(
+            PopupPlacement::BottomLeft.resolved(),
+            PopupPlacement::BottomLeft
+        );
+        let defaults = Settings::default();
+        assert_eq!(defaults.popup_floating, !cfg!(windows));
+        assert!(PopupPlacement::choices().contains(&defaults.popup_placement));
+        let settings = Settings {
+            popup_placement: PopupPlacement::BottomCenter,
+            ..Settings::default()
+        };
+        let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored.popup_placement, PopupPlacement::BottomCenter);
+    }
+
     fn id(kind: ProviderKind) -> ProviderId {
         ProviderId::primary(kind)
     }
@@ -4110,11 +4335,11 @@ mod tests {
         let path = directory.path().join("settings.toml");
         fs::write(
             &path,
-            r#"
+            r"
 version = 28
 show_banked_resets = false
 show_usage_stats = false
-"#,
+",
         )
         .unwrap();
 
@@ -4257,13 +4482,13 @@ show_usage_stats = false
         let path = directory.path().join("settings.toml");
         fs::write(
             &path,
-            r#"
+            r"
 automatic_activation = false
 start_at_login = true
 history_retention_days = 30
 check_for_updates = false
 tray_widgets = []
-"#,
+",
         )
         .unwrap();
 
@@ -4472,9 +4697,9 @@ enabled = ["codex", "claude"]
     }
 
     #[test]
-    fn floating_panel_settings_default_to_tray_and_round_trip() {
+    fn floating_panel_settings_default_per_platform_and_round_trip() {
         let mut settings: Settings = toml::from_str("onboarding_completed = true").unwrap();
-        assert!(!settings.popup_floating);
+        assert_eq!(settings.popup_floating, !cfg!(windows));
         assert!(settings.popup_position.is_none());
         assert_eq!(settings.popup_height_dip, None);
         settings.popup_height_dip = Some(900);
@@ -4910,5 +5135,72 @@ enabled = true
         assert_eq!(loaded.version, SETTINGS_VERSION);
         assert!(loaded.onboarding_completed);
         assert!(path.with_extension("toml.corrupt").exists());
+    }
+
+    #[test]
+    fn corrupt_recovery_keeps_original_bytes_and_persists_usable_defaults() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.toml");
+        let corrupt = "version = [\nthis is not TOML";
+        fs::write(&path, corrupt).unwrap();
+        let recovered = Settings::load_or_create(&path).unwrap();
+        assert_eq!(
+            fs::read_to_string(path.with_extension("toml.corrupt")).unwrap(),
+            corrupt
+        );
+        let saved = fs::read_to_string(&path).unwrap();
+        let reloaded = Settings::load_or_create(&path).unwrap();
+        assert_eq!(
+            toml::to_string(&recovered).unwrap(),
+            toml::to_string(&reloaded).unwrap()
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), saved);
+        assert!(reloaded.onboarding_completed);
+    }
+
+    #[test]
+    fn importing_legacy_or_corrupt_files_never_rewrites_or_creates_backups() {
+        for (raw, valid) in [
+            (
+                "automatic_activation = false\nstart_at_login = true\ntray_widgets = []\n",
+                true,
+            ),
+            ("version = [broken", false),
+        ] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("import.toml");
+            fs::write(&path, raw).unwrap();
+            let result = Settings::load_from_import(&path);
+            assert_eq!(result.is_ok(), valid);
+            if let Ok(settings) = result {
+                assert_eq!(settings.version, SETTINGS_VERSION);
+                assert!(settings.start_at_login);
+                assert!(
+                    settings
+                        .instances
+                        .iter()
+                        .all(|instance| !instance.auto_activation)
+                );
+            }
+            assert_eq!(fs::read_to_string(&path).unwrap(), raw);
+            assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+        }
+    }
+
+    #[test]
+    fn future_unknown_scalars_do_not_reset_known_preferences_on_roundtrip() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.toml");
+        fs::write(&path, format!(
+            "version = {}\nstart_at_login = true\ncheck_for_updates = false\nfuture_option = 'new-value'\n",
+            SETTINGS_VERSION + 1
+        )).unwrap();
+        let settings = Settings::load_or_create(&path).unwrap();
+        assert!(settings.start_at_login);
+        assert!(!settings.check_for_updates);
+        settings.save(&path).unwrap();
+        let reloaded = Settings::load_or_create(&path).unwrap();
+        assert!(reloaded.start_at_login);
+        assert!(!reloaded.check_for_updates);
     }
 }

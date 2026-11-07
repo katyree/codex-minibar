@@ -62,6 +62,8 @@ pub enum NotificationAction {
     OpenUrl(String),
     /// Never treat this executable as a game again.
     IgnoreGame(String),
+    /// Apply or skip an announced automatic reset.
+    AutoReset(crate::banked_reset::AutoResetChoice),
 }
 
 impl NotificationAction {
@@ -85,6 +87,7 @@ impl NotificationAction {
                 }
             }
             NotificationAction::IgnoreGame(path) => crate::game_mode::ignore_game(path),
+            NotificationAction::AutoReset(choice) => crate::banked_reset::choose(choice),
         });
     }
 }
@@ -199,6 +202,15 @@ impl Notification {
         notification
     }
 
+    /// Cards that wait for a decision or a read stay until closed by hand.
+    pub fn stays_until_closed(&self) -> bool {
+        self.summary.is_some()
+            || self
+                .actions
+                .iter()
+                .any(|(_, action)| matches!(action, NotificationAction::AutoReset(_)))
+    }
+
     /// How long the card stays before it leaves on its own. Cards with
     /// quotas get a little longer to be read.
     pub fn lifetime(&self) -> std::time::Duration {
@@ -290,9 +302,17 @@ pub fn notify(notification: Notification) {
             notification.title, notification.body
         ));
     }
+    #[cfg(windows)]
     crate::popup_window::send_command(crate::popup_window::PopupCommand::Toast(Box::new(
         notification,
     )));
+    // Linux windows cannot be click-through or (on Wayland) placed in a
+    // corner, so cards go to the desktop's notification server instead.
+    #[cfg(not(windows))]
+    {
+        let silent = !SOUND_ENABLED.load(Ordering::Relaxed) || quiet_reason(false).is_some();
+        crate::linux::notify::post(notification, silent);
+    }
 }
 
 /// An informational notification.
@@ -310,8 +330,8 @@ pub fn show_error(title: &str, body: &str) {
 }
 
 /// A discovered app update with install and release-notes buttons.
-pub fn show_update_available(version: &str, release_url: &str) {
-    notify(update_available(version, release_url));
+pub fn show_update_available(version: &str, release_url: &str, installable: bool) {
+    notify(update_available(version, release_url, installable));
 }
 
 /// Moves the update card to the next step, creating it on the first one.
@@ -391,7 +411,7 @@ pub fn show_provider_incident(
     notify(notification);
 }
 
-fn update_available(version: &str, release_url: &str) -> Notification {
+fn update_available(version: &str, release_url: &str, installable: bool) -> Notification {
     let mut notification = Notification::new(
         NotificationKind::Update,
         crate::i18n::tr("update-available-67fd3a"),
@@ -400,16 +420,17 @@ fn update_available(version: &str, release_url: &str) -> Notification {
             crate::i18n::tr("a-new-release-is-ready-to-install")
         ),
     );
-    notification.actions = vec![
-        (
+    // Otherwise the update comes from the release page linked below.
+    if installable {
+        notification.actions.push((
             crate::i18n::tr("update-now").to_owned(),
             NotificationAction::InstallUpdate,
-        ),
-        (
-            crate::i18n::tr("what-s-new").to_owned(),
-            NotificationAction::OpenUrl(release_url.to_owned()),
-        ),
-    ];
+        ));
+    }
+    notification.actions.push((
+        crate::i18n::tr("what-s-new").to_owned(),
+        NotificationAction::OpenUrl(release_url.to_owned()),
+    ));
     notification
 }
 
@@ -452,6 +473,7 @@ fn show_activation(
 /// Plays the sound of `notification` unless sounds are off, quiet hours are
 /// on, or Windows says the user is presenting, gaming full screen or
 /// otherwise busy.
+#[cfg(windows)]
 pub(crate) fn play_sound(notification: &Notification) {
     // Cards that still show during quiet hours do so silently.
     if !SOUND_ENABLED.load(Ordering::Relaxed) || quiet_reason(false).is_some() {

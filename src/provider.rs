@@ -214,6 +214,12 @@ fn start_driver_worker(
         };
     }
     Ok(match instance.driver {
+        driver if crate::fake::serves(driver) => start_worker!(
+            crate::fake::FakeProvider(driver),
+            crate::fake::FakeProvider(driver),
+            crate::fake::FakeProvider(driver),
+            true
+        ),
         ProviderKind::Codex => {
             let executable = first_available(instance.binary_path.as_deref())
                 .unwrap_or_else(|_| PathBuf::from("codex"));
