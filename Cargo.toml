@@ -1,6 +1,6 @@
 [package]
 name = "codex-minibar"
-version = "1.5.2-junie.2"
+version = "1.7.0-junie.1"
 edition = "2024"
 description = "Windows and Linux tray companion for monitoring AI tools usage"
 license = "Apache-2.0"
@@ -31,7 +31,7 @@ serde_json = "1"
 sha2 = "0.10"
 toml = "0.9"
 tempfile = "3"
-ureq = { version = "2", default-features = false, features = ["tls", "native-tls"] }
+ureq = { version = "2", default-features = false, features = ["tls", "native-tls", "proxy-from-env"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 zip = "2"
 zeroize = "1"
@@ -81,6 +81,9 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphic
 # (already used by GPUI), the Secret Service.
 [target.'cfg(not(windows))'.dependencies]
 ashpd = { version = "0.12", default-features = false, features = ["async-std"] }
+# GPUI's renderer, probed at startup to pick the AppImage's software Vulkan
+# fallback (src/platform/linux/vulkan.rs). Keep it on GPUI's version.
+blade-graphics = "0.7"
 flate2 = "1"
 font-kit = { package = "zed-font-kit", version = "0.14.1-zed", features = ["source-fontconfig-dlopen"] }
 # The workspace-wide entry disables GPUI's defaults (Windows needs none of
@@ -122,3 +125,6 @@ ttf-parser = { opt-level = 3 }
 # Translucent windows otherwise draw anti-aliased edges as gray hairlines.
 [patch.crates-io]
 gpui = { path = "vendor/gpui" }
+
+# HTTPS CONNECT tunnels use origin-form request targets (Cursor rejects absolute-form).
+ureq = { path = "vendor/ureq" }

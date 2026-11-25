@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/vertopolkaLF/codex-minibar/releases">Download</a>
+  <a href="https://github.com/katyree/codex-minibar/releases">Download for Windows x64</a>
   |
   <a href="https://vertopolkalf.ru/codex-minibar/">Website</a>
   |
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/downloads/vertopolkalf/codex-minibar/total?style=flat-square" alt="Downloads">
+  <img src="https://img.shields.io/github/downloads/katyree/codex-minibar/total?style=flat-square" alt="Downloads">
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20%7C%20Linux-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/Rust-2024-orange?style=flat-square" alt="Rust edition">
   <img src="https://img.shields.io/badge/UI-GPUI-green?style=flat-square" alt="UI framework">
@@ -148,6 +148,8 @@ See spending per key and manage OpenRouter API keys from the popup's OpenRouter 
   on weekends.
 - Usage pace indicators show whether you are burning a window faster than it resets.
 - Kiro's monthly included credits and reset date, and Claude cloud-session credit balances.
+- Several OpenCode Go API keys per provider, each with its own five-hour, weekly and monthly
+  windows, for Go Teams members and extra workspaces.
 - Command Code's five-hour, weekly and monthly credit windows, plus any purchased top-up balance.
 - Warnings before a Claude login stops renewing.
 - An optional Stream Deck companion with quota keys that open the popup or a provider tab and
@@ -196,6 +198,22 @@ shows only the rolling windows. Usage statistics come from the CLI's local sessi
 `~/.commandcode/projects`, using the credit cost the CLI recorded for each response; transcripts
 written by CLI versions that did not record token usage contribute nothing.
 Browser-session access is not used.
+
+### Add another OpenCode Go key
+
+Open **Settings → Providers → OpenCode Go → Add API key** for every key that
+belongs to the subscription. Go Teams bills per member and gives each member
+their own limits, so a workspace can need several keys at once. Minibar queries
+each key separately and lists their quota windows on Home and the OpenCode Go
+tab. With several keys, these rows replace the aggregate cards; disabling the
+API keys card shows ordinary quota cards per key. Instance-wide tray indicators
+and notifications use the most consumed key for each window, while widget
+indicators can select an individual key. Failed keys keep their error rows,
+even when every key fails. Rename a key to tell members apart, or remove it
+when the member leaves; the last slot stays with its saved secret cleared.
+Only key identities and names live in the settings file; secrets stay in
+protected storage (DPAPI on Windows, Secret Service-backed encryption on Linux). See
+[`docs/opencode-go-keys.md`](docs/opencode-go-keys.md).
 
 ### Add another Codex account
 
@@ -265,8 +283,8 @@ credential clears only its sample. A partial HTTP 429 still pauses Claude pollin
 
 ## Install
 
-1. Open the [latest release](https://github.com/vertopolkaLF/codex-minibar/releases/latest).
-2. Download the installer matching your Windows architecture (`x64` or `arm64`) and run it.
+1. Open the [fork releases](https://github.com/katyree/codex-minibar/releases).
+2. Download the Windows x64 installer and run it.
    The installer is per-user and does not require administrator rights.
 3. Alternatively, download the matching `portable.zip`, extract it, and run
    `codex-minibar.exe`.
@@ -285,10 +303,10 @@ available from **Settings → Log → Run Troubleshoot with AI**.
 ## Linux
 
 Codex Minibar also runs on Linux desktops under Wayland and X11. Download from the
-[latest release](https://github.com/vertopolkaLF/codex-minibar/releases/latest):
+[latest upstream release](https://github.com/vertopolkaLF/codex-minibar/releases/latest):
 
 - **Debian/Ubuntu:** `sudo apt install ./codex-minibar_<version>_amd64.deb`
-- **Any distribution, no install:** make `codex-minibar-<version>-linux-x64.AppImage` executable
+- **Any distribution, no install:** make `codex-minibar-<version>-x86_64.AppImage` executable
   and run it. If FUSE mounting is unavailable, add `--appimage-extract-and-run`;
   generated launchers and autostart entries preserve that mode, as does updating.
   Managed launches use separate temporary extraction directories, so opening the
@@ -297,7 +315,7 @@ Codex Minibar also runs on Linux desktops under Wayland and X11. Download from t
   (or `sudo zypper install ...`).
 - **Arch Linux:** build the `PKGBUILD` attached to each release with `makepkg -si`
   (it packages the release tarball as `codex-minibar-bin`).
-- **Other distributions:** extract `codex-minibar-<version>-linux-x64.tar.gz` and run
+- **Other distributions:** extract `codex-minibar-<version>-x86_64.tar.gz` and run
   `./install.sh` to install into `~/.local`, or run `bin/codex-minibar` in place.
 
 Portable AppImage and tarball installs also need `xdg-utils` for opening links
@@ -482,14 +500,14 @@ cargo test --all-targets --all-features --locked
 
 Every window is rendered with [GPUI](https://gpui.rs) on one dedicated UI thread: the tray
 popup, the Settings window and the first-launch onboarding. Settings controls (toggles,
-dropdowns, sliders, text inputs, dialogs) live in `src/settings_window/kit.rs` and
-`src/settings_window/input.rs`. No UI framework runtime is redistributed; the release
+dropdowns, sliders, text inputs, dialogs) live in `src/ui/gui/kit.rs` and
+`src/ui/gui/input.rs`. No UI framework runtime is redistributed; the release
 package is the executable plus its `assets` folder.
-CI checks formatting, lints, and tests on Windows and Linux. Linux desktop integration
+CI checks formatting and runs Clippy and tests on the Windows x64 build. Linux desktop integration
 (tray, notifications, portal settings, keyring, autostart, single instance, the D-Bus status
-service) lives in `src/linux/`. `codex-minibar status` is `src/status.rs`; it and the D-Bus
+service) lives in `src/platform/linux/`. `codex-minibar status` is `src/surfaces/status.rs`; it and the D-Bus
 service share one report, served to the CLI over the same loopback bridge as Stream Deck
-(`src/streamdeck.rs`). The GNOME Shell extension and Plasma widget live in `integrations/`.
+(`src/surfaces/streamdeck.rs`). The GNOME Shell extension and Plasma widget live in `integrations/`.
 
 ### Stream Deck companion
 

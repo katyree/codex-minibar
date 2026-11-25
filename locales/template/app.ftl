@@ -392,6 +392,7 @@ updated = { "" }
 # English source:
 # refresh-last-updated-relative = Refresh | Last updated { $relative }
 refresh-last-updated-relative = { "" }
+refresh-provider = { "" }
 
 # English source:
 # popup-pin = Pin on top and keep open
@@ -568,6 +569,22 @@ gemini = { "" }
 # English source:
 # claude-gpt = Claude + GPT
 claude-gpt = { "" }
+
+# English source:
+# gemini-5h = Gemini 5h
+gemini-5h = { "" }
+
+# English source:
+# gemini-weekly = Gemini weekly
+gemini-weekly = { "" }
+
+# English source:
+# claude-gpt-5h = Claude + GPT 5h
+claude-gpt-5h = { "" }
+
+# English source:
+# claude-gpt-weekly = Claude + GPT weekly
+claude-gpt-weekly = { "" }
 
 # English source:
 # credits = Credits
@@ -996,6 +1013,10 @@ reset-using = { "" }
 # English source:
 # reset-confirm-message = Use one banked reset for this account? This clears eligible rate-limit windows and cannot be undone.
 reset-confirm-message = { "" }
+
+# English source:
+# reset-confirm-selected = Use “{ $name }”? This clears the limits it covers and cannot be undone.
+reset-confirm-selected = { "" }
 
 # English source:
 # reset-applied = Reset applied. Your eligible limits have been cleared.
@@ -2338,6 +2359,14 @@ is-off-so-it-doesn-t-appear-in-the-minibar-or-tray-turn-it-on-to = { "" }
 replace-chatgpt-logo-with-codex = { "" }
 
 # English source:
+# show-fable-inside-the-weekly-bar = Show Fable inside the weekly bar
+show-fable-inside-the-weekly-bar = { "" }
+
+# English source:
+# draws-the-fable-only-limit-as-a-colored-segment-of-the-weekly-bar = Draws the Fable-only limit as a colored segment of the weekly bar instead of a separate card.
+draws-the-fable-only-limit-as-a-colored-segment-of-the-weekly-bar = { "" }
+
+# English source:
 # limits-only = Limits only
 limits-only = { "" }
 
@@ -2721,6 +2750,15 @@ cursor-app = { "" }
 # antigravity-app = Antigravity app
 antigravity-app = { "" }
 
+# antigravity-profile-folder = Antigravity profile folder
+antigravity-profile-folder = { "" }
+
+# antigravity-default-profile = Leave blank to use the default agy sign-in, or select the GEMINI_HOME of a signed-in profile.
+antigravity-default-profile = { "" }
+
+# antigravity-isolated-profile = Select a signed-in T3 Code profile, or set GEMINI_HOME to this folder and run agy acp --login in SSH mode.
+antigravity-isolated-profile = { "" }
+
 # English source:
 # grok-cli = Grok CLI
 grok-cli = { "" }
@@ -3006,14 +3044,6 @@ exit = { "" }
 update-available-67fd3a = { "" }
 
 # English source:
-# monthly-credits-976559 = Monthly Credits
-monthly-credits-976559 = { "" }
-
-# English source:
-# msg-5h-session-de7ce8 = 5h Session
-msg-5h-session-de7ce8 = { "" }
-
-# English source:
 # name-weekly = { $name } weekly
 name-weekly = { "" }
 
@@ -3229,11 +3259,6 @@ this-provider-does-not-use-a-config-folder = { "" }
 could-not-save-provider-settings-error-restoring-its-previous-cre = { "" }
 
 # English source:
-# msg-5h-7d = 5h  |  { $v0 }  |  { $v1 }
-#     7d  |  { $v2 }  |  { $v3 }
-msg-5h-7d = { "" }
-
-# English source:
 # api-key-count = { $v0 ->
 #     [one] { $v0 } API key
 #    *[other] { $v0 } API keys
@@ -3339,6 +3364,18 @@ quota-percent-used = { "" }
 # English source:
 # quota-percent-left = { $value }% left
 quota-percent-left = { "" }
+
+# English source:
+# quota-all = All
+quota-all = { "" }
+
+# English source:
+# quota-word-left = left
+quota-word-left = { "" }
+
+# English source:
+# quota-word-used = used
+quota-word-used = { "" }
 
 # English source:
 # cloud-amount-used = { $amount } of { $limit } used
@@ -3729,6 +3766,14 @@ notify-about-new-incidents-description = { "" }
 open-status-page = { "" }
 
 # English source:
+# hide-incident = Hide incident
+hide-incident = { "" }
+
+# English source:
+# show-incident = Show incident
+show-incident = { "" }
+
+# English source:
 # provider-incident-title = { $provider }: { $impact }
 provider-incident-title = { "" }
 
@@ -3792,6 +3837,7 @@ muse-session-missing = Connect your signed-in Muse account from Chrome to read w
 muse-remove-session = Remove Muse session
 muse-remove-session-help = Minibar will forget the saved session credential. Your Chrome sign-in stays unchanged.
 muse-session-removed = Muse session removed
+
 # English source:
 # no-summary-for-this-version = There's no summary for this version yet. The full release notes are on GitHub.
 no-summary-for-this-version = { "" }
@@ -4411,6 +4457,8 @@ skip-automatic-reset = { "" }
 banked-reset-applied = { "" }
 
 # English source:
+# claude-other-account-needs-cli = Extra Claude accounts need the Claude Code CLI. The Claude app's built-in copy only serves the app's own account.
+claude-other-account-needs-cli = { "" }
 # linux-no-tray-title = No system tray found
 linux-no-tray-title = { "" }
 
@@ -4520,3 +4568,20 @@ linux-folder-with-agy-exe-agy-cmd-or-agy-ps1-leave-empty-to-find-it-aut = { "" }
 
 linux-folder-with-grok-cli = Folder with the grok executable. Leave empty to find it automatically.
 linux-folder-with-command-code-cli = Folder with command-code or cmd. Leave empty to find it automatically.
+
+usage-currency = Usage currency
+usage-currency-description = Display usage costs at the latest available rate, including historical usage.
+currency-unavailable = Rate unavailable; showing USD
+currency-cached = Cached rate
+currency-latest = Latest rate
+currency-usd = Usage currency: USD
+currency-daily-cost = Daily cost in the selected currency
+currency-cost-by-model = Cost by model
+no-matching-currencies = No matching currencies
+currency-symbol = Currency symbol
+currency-symbol-description = Shown exactly as typed, spaces included. Leave empty for the default.
+currency-symbol-position = Symbol position
+currency-symbol-before = Before amount
+currency-symbol-after = After amount
+currency-source = Rates by Exchange Rate API
+reads-workbuddy-token-history-from-your-local-workbuddy-transcripts = { "" }
